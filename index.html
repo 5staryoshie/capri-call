@@ -55,6 +55,11 @@
        border-radius:22px;padding:11px 16px;font-size:16px;outline:none}
   .typebar button{background:var(--pink);border:0;color:#fff;border-radius:22px;padding:0 16px;font-weight:600;font-size:15px}
 
+  .vol{display:none;width:100%;max-width:360px;align-items:center;gap:12px;margin-bottom:18px;color:var(--dim)}
+  .vol.show{display:flex}
+  .vol svg{width:22px;height:22px;flex:none}
+  .vol input{flex:1;min-width:0;height:30px;accent-color:var(--pink)}
+  .vol .pct{width:46px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums}
   .controls{display:flex;gap:22px;align-items:flex-start;justify-content:center}
   .ctl{display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--dim);font-size:12px}
   .btn{width:66px;height:66px;border-radius:50%;border:0;display:grid;place-items:center;background:var(--glass);
@@ -94,6 +99,12 @@
     <input id="typed" placeholder="Type to Capri..." enterkeyhint="send">
     <button type="submit">Send</button>
   </form>
+
+  <div class="vol" id="volbar">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+    <input type="range" id="vol" min="0" max="200" step="5" value="100" aria-label="Capri's volume">
+    <span class="pct" id="volPct">100%</span>
+  </div>
 
   <div class="controls" id="idleCtl">
     <div class="ctl">
@@ -169,6 +180,49 @@ document.getElementById("icon").href = CAPRI_FACES.calm;
   let speechMs = 0, silenceMs = 0, listenStart = 0, heardAny = false, floor = 0.01, lastTick = 0;
   let muted = false, captions = true, es = null, wakeLock = null, callStart = 0, clockIv = null, vadIv = null, laptopSeen = false;
   const player = new Audio(); player.playsInline = true; player.preload = 'auto';
+  // her volume: 0 to 200%. iPhone ignores audio.volume, so her voice goes through a Web Audio gain instead
+  let vol = 1, gain = null, herSrc = null;
+  try { const v = parseFloat(localStorage.getItem('capri-vol')); if (!isNaN(v)) vol = Math.max(0, Math.min(2, v)); } catch (e) {}
+  function ensureGain() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!gain) { gain = ctx.createGain(); gain.connect(ctx.destination); }
+    gain.gain.value = vol;
+  }
+  function applyVol() {
+    if (gain) gain.gain.value = vol;
+    player.volume = Math.min(1, vol);
+    $('vol').value = Math.round(vol * 100);
+    $('volPct').textContent = Math.round(vol * 100) + '%';
+  }
+  function stopHer() {
+    if (herSrc) { const s = herSrc; herSrc = null; s.onended = null; try { s.stop(); } catch (e) {} }
+    try { player.pause(); } catch (e) {}
+    try { speechSynthesis.cancel(); } catch (e) {}
+  }
+  async function playHer(url, text) {
+    try {
+      ensureGain();
+      if (ctx.state === 'suspended') await ctx.resume();
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('fetch ' + r.status);
+      const data = await r.arrayBuffer();
+      const audio = await new Promise((res, rej) => { const p = ctx.decodeAudioData(data, res, rej); if (p && p.then) p.then(res, rej); });
+      if (state !== 'speak') return;
+      stopHer();
+      const s = ctx.createBufferSource();
+      s.buffer = audio; s.connect(gain);
+      s.onended = () => { if (herSrc === s) { herSrc = null; resumeAfterTurn(); } };
+      herSrc = s; s.start();
+    } catch (e) {
+      if (state !== 'speak') return;
+      // fallback: plain audio element (volume works up to 100% except on iPhone)
+      player.src = url; player.volume = Math.min(1, vol);
+      player.onended = () => resumeAfterTurn();
+      player.onerror = () => speakFallback(text);
+      const p = player.play();
+      if (p && p.catch) p.catch(() => speakFallback(text));
+    }
+  }
 
   function setStatus(t, cls) { statusEl.textContent = t; statusEl.className = 'status' + (cls ? ' ' + cls : ''); }
   function setFace(m) { m = ALIAS[m] || m; if (FACES[m]) face.src = FACES[m]; }
@@ -251,19 +305,14 @@ document.getElementById("icon").href = CAPRI_FACES.calm;
     setFace(j.mood || 'calm');
     if (state === 'idle') return;
     setState('speak');
-    if (audioUrl) {
-      player.src = audioUrl;
-      player.onended = () => resumeAfterTurn();
-      player.onerror = () => speakFallback(j.text);
-      const p = player.play();
-      if (p && p.catch) p.catch(() => speakFallback(j.text));
-    } else speakFallback(j.text);
+    if (audioUrl) playHer(audioUrl, j.text);
+    else speakFallback(j.text);
   }
 
   function speakFallback(text) {
     if (!('speechSynthesis' in window) || !text) { setTimeout(resumeAfterTurn, 1200 + 45 * (text || '').length); return; }
     const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.05; u.pitch = 1.15;
+    u.rate = 1.05; u.pitch = 1.15; u.volume = Math.min(1, vol);
     u.onend = () => resumeAfterTurn();
     u.onerror = () => resumeAfterTurn();
     speechSynthesis.cancel(); speechSynthesis.speak(u);
@@ -359,11 +408,12 @@ document.getElementById("icon").href = CAPRI_FACES.calm;
     unlockAudio();
     pickType();
     session = Math.random().toString(36).slice(2, 8); turnN = 0; laptopSeen = false;
-    $('idleCtl').style.display = 'none'; $('callCtl').style.display = 'flex';
+    $('idleCtl').style.display = 'none'; $('callCtl').style.display = 'flex'; $('volbar').classList.add('show');
     caption('', ''); setFace('calm');
     state = 'connecting'; setStatus('Calling...');
     try {
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      ensureGain();
       await ctx.resume();
       await ensureMic();
     } catch (e) { setStatus('Mic blocked: allow it in Settings > Safari > Microphone', 'warn'); }
@@ -388,17 +438,22 @@ document.getElementById("icon").href = CAPRI_FACES.calm;
     state = 'idle';
     clearInterval(clockIv); clearInterval(vadIv); clearTimeout(turnTimer); pendingTurn = null;
     await stopRecorder(true);
-    try { player.pause(); } catch (e) {}
-    try { speechSynthesis.cancel(); } catch (e) {}
+    stopHer();
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; analyser = null; }
     if (es) { es.close(); es = null; }
     try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
-    $('callCtl').style.display = 'none'; $('idleCtl').style.display = 'flex'; $('typebar').classList.remove('show');
+    $('callCtl').style.display = 'none'; $('idleCtl').style.display = 'flex'; $('typebar').classList.remove('show'); $('volbar').classList.remove('show');
     avatar.className = 'avatar'; $('timer').textContent = '';
     setStatus('Call ended'); setFace('calm');
     setTimeout(() => { if (state === 'idle') setStatus('Tap to call'); }, 2500);
   }
 
+  applyVol();
+  $('vol').oninput = () => {
+    vol = Math.max(0, Math.min(2, Number($('vol').value) / 100));
+    applyVol();
+    try { localStorage.setItem('capri-vol', String(vol)); } catch (e) {}
+  };
   $('callBtn').onclick = startCall;
   $('hangBtn').onclick = endCall;
   $('muteBtn').onclick = async () => {
@@ -415,13 +470,13 @@ document.getElementById("icon").href = CAPRI_FACES.calm;
     const v = $('typed').value.trim();
     if (!v || state === 'idle') return;
     $('typed').value = '';
-    try { player.pause(); speechSynthesis.cancel(); } catch (er) {}
+    stopHer();
     sendText(v);
   };
   // tap her while she talks to cut in
   avatar.onclick = () => {
     if (state !== 'speak') return;
-    try { player.pause(); speechSynthesis.cancel(); } catch (e) {}
+    stopHer();
     resumeAfterTurn();
   };
   document.addEventListener('visibilitychange', async () => {
