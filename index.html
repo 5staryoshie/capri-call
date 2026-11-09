@@ -335,7 +335,7 @@ document.getElementById("icon").href = CAPRI_FACES.calm;
     if (lv > thr) { speechMs += dt; silenceMs = 0; if (speechMs > 180) heardAny = true; }
     else { silenceMs += dt; if (!heardAny) speechMs = Math.max(0, speechMs - dt); }
     const long = now - listenStart;
-    if (heardAny && (silenceMs > 1150 || long > 28000)) {
+    if (heardAny && (silenceMs > 800 || long > 28000)) {
       const blob = await stopRecorder(false);
       if (blob && blob.size > 1500) sendVoice(blob); else startListening();
       return;
@@ -384,6 +384,7 @@ document.getElementById("icon").href = CAPRI_FACES.calm;
   }
 
   async function endCall() {
+    if (state !== 'idle') post(MARK + session + '-0 bye').catch(() => {});
     state = 'idle';
     clearInterval(clockIv); clearInterval(vadIv); clearTimeout(turnTimer); pendingTurn = null;
     await stopRecorder(true);
