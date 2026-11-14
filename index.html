@@ -221,6 +221,20 @@
   // ---------------------------------------------------------- her faces (sent once by the laptop, kept on the phone)
   const ALIAS = {};
   let faces = store.get('capri-faces', {fv: '', imgs: {}});
+  // her little "thinking" sounds (made once on the laptop, kept here)
+  let fillers = store.get('capri-fillers', {v: '', clips: {}});
+  let audioQ = [], moreTurn = null, moreTimer = null, waitingMore = false;
+  let fillerTimer = null, fillerPlaying = false, pendingGo = null, lastFiller = '';
+  async function gotFiller(j, url) {
+    if (!url || !j.name) return;
+    try {
+      const b = await (await fetch(url)).blob();
+      const data = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+      if (fillers.v !== j.flv) fillers = {v: j.flv || '', clips: {}};
+      fillers.clips[j.name] = data;
+      store.set('capri-fillers', fillers);
+    } catch (e) {}
+  }
   let curMood = 'calm';
   function setFace(m, glitch) {
     m = m || 'calm';
@@ -262,6 +276,8 @@
   function setStatus(t, cls) { $('stateText').textContent = t; statusEl.className = 'state ' + (cls || ''); }
   function setState(s) {
     state = s;
+    clearTimeout(fillerTimer);
+    if (s === 'think') fillerTimer = setTimeout(playFiller, 900);
     wrap.classList.toggle('listen', s === 'listen');
     wrap.classList.toggle('speak', s === 'speak');
     if (s === 'listen') setStatus('LISTENING', 'live');
@@ -304,10 +320,13 @@
       if (j.t === 'hi') {
         laptopSeen = true;
         if (j.fv && j.fv !== faces.fv) post(MARK + session + '-0 faces').catch(() => {});
+        if (j.flv && j.flv !== fillers.v) setTimeout(() => post(MARK + session + '-0 fillers').catch(() => {}), 2500);
         if (state === 'connecting') { setStatus('CONNECTED', 'live'); setTimeout(startListening, 350); }
         return;
       }
       if (j.t === 'face') { gotFace(j, d.attachment && d.attachment.url); return; }
+      if (j.t === 'filler') { gotFiller(j, d.attachment && d.attachment.url); return; }
+      if (j.t === 'more' && j.turn === moreTurn) { gotMore(j, d.attachment && d.attachment.url); return; }
       if (j.t === 'heard' && j.turn === pendingTurn) { showHeard(j.heard); return; }
       if (j.t === 'reply' && j.turn === pendingTurn) onReply(j, d.attachment && d.attachment.url);
     };
@@ -376,14 +395,53 @@
     lastHer = addMsg(true, j.text || '');
     setFace(j.mood || 'calm', true);
     if (state === 'idle') return;
+    audioQ = []; clearTimeout(moreTimer); waitingMore = false;
+    moreTurn = j.more ? j.turn : null;               // the rest of what she says is on its way as a second clip
     setState('speak'); speakStart = performance.now(); bargeMs = 0;
-    if (audioUrl) {
-      player.src = audioUrl;
-      player.onended = () => { if (state === 'speak') resumeAfterTurn(); };
-      player.onerror = () => speakFallback(j.text);
-      const p = player.play();
-      if (p && p.catch) p.catch(() => speakFallback(j.text));
-    } else speakFallback(j.text);
+    const go = () => {
+      if (state !== 'speak') return;
+      if (audioUrl) playClip(audioUrl, j.text);
+      else { moreTurn = null; speakFallback(j.text); }
+    };
+    if (fillerPlaying) pendingGo = go; else go();
+  }
+
+  // ---- her reply can come in two clips: play them back to back
+  function playClip(url, text) {
+    player.src = url;
+    player.onended = clipEnded;
+    player.onerror = () => { moreTurn = null; audioQ = []; speakFallback(text); };
+    const p = player.play();
+    if (p && p.catch) p.catch(() => { moreTurn = null; audioQ = []; speakFallback(text); });
+  }
+  function clipEnded() {
+    if (state !== 'speak') return;
+    if (audioQ.length) { playClip(audioQ.shift(), ''); return; }
+    if (moreTurn) {
+      waitingMore = true;
+      moreTimer = setTimeout(() => { waitingMore = false; moreTurn = null; if (state === 'speak') resumeAfterTurn(); }, 9000);
+      return;
+    }
+    resumeAfterTurn();
+  }
+  function gotMore(j, url) {
+    moreTurn = null;
+    if (!url || j.fail) { if (waitingMore) { clearTimeout(moreTimer); waitingMore = false; if (state === 'speak') resumeAfterTurn(); } return; }
+    if (waitingMore) { clearTimeout(moreTimer); waitingMore = false; if (state === 'speak') playClip(url, ''); }
+    else audioQ.push(url);
+  }
+  function playFiller() {
+    if (state !== 'think') return;
+    const names = Object.keys(fillers.clips || {});
+    if (!names.length) return;
+    let pick = names[Math.floor(Math.random() * names.length)];
+    if (pick === lastFiller && names.length > 1) pick = names[(names.indexOf(pick) + 1) % names.length];
+    lastFiller = pick;
+    fillerPlaying = true;
+    const done = () => { fillerPlaying = false; const g = pendingGo; pendingGo = null; if (g) g(); };
+    player.src = fillers.clips[pick];
+    player.onended = done; player.onerror = done;
+    const p = player.play(); if (p && p.catch) p.catch(done);
   }
 
   function speakFallback(text) {
@@ -395,7 +453,10 @@
     speechSynthesis.cancel(); speechSynthesis.speak(u);
   }
 
-  function hush() { try { player.pause(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {} }
+  function hush() {
+    audioQ = []; moreTurn = null; clearTimeout(moreTimer); waitingMore = false; fillerPlaying = false; pendingGo = null; clearTimeout(fillerTimer);
+    try { player.pause(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {}
+  }
 
   function resumeAfterTurn() {
     if (state === 'idle') return;
@@ -598,7 +659,7 @@
   $('mCaps').onclick = () => { captions = !captions; store.set('capri-caps', captions); paintSettings(); };
   $('mClear').onclick = () => { log.innerHTML = ''; typingEl = null; $('menu').classList.remove('show'); };
   $('mFaces').onclick = () => {
-    faces = {fv: '', imgs: {}}; store.set('capri-faces', faces); $('menu').classList.remove('show');
+    faces = {fv: '', imgs: {}}; store.set('capri-faces', faces); fillers = {v: '', clips: {}}; store.set('capri-fillers', fillers); $('menu').classList.remove('show');
     if (state !== 'idle' && session) post(MARK + session + '-0 faces').catch(() => {});
     else addMsg(true, 'I’ll send my faces again when you call.');
   };
