@@ -238,6 +238,17 @@
   .form input{flex:1;min-width:0;background:#2c1018;border:1.3px solid rgba(236,46,58,.6);color:#ffe4dc;font:inherit;font-size:16px;padding:10px;border-radius:0;outline:none;-webkit-user-select:text;user-select:text}
   .form input:focus{border-color:var(--yel)}
   .form input.w2{flex:0 0 92px}
+  .form textarea{flex:1;min-width:0;background:#2c1018;border:1.3px solid rgba(94,226,236,.55);color:#ffe4dc;font:inherit;font-size:16px;padding:10px;border-radius:0;outline:none;resize:vertical;min-height:96px;-webkit-user-select:text;user-select:text}
+  .form textarea:focus{border-color:var(--cyan)}
+  .ranks{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+  .rk{display:flex;justify-content:space-between;gap:4px;font-size:9.5px;letter-spacing:.5px;color:var(--yel);white-space:nowrap}
+  .rk.c{color:var(--cyan-ink)} .rk span:last-child{color:var(--dim);font-family:"Share Tech Mono",monospace}
+  .jrow{padding:10px 2px;border-bottom:1px solid rgba(94,226,236,.18)}
+  .jrow .top{display:flex;justify-content:space-between;align-items:center;font-family:"Share Tech Mono",monospace;font-size:12px;color:var(--dim)}
+  .jrow p{margin:5px 0 0;font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .mood{font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:10px;padding:1px 7px;letter-spacing:1px}
+  .mood.great{background:var(--cyan);color:#06181b} .mood.good{background:rgba(94,226,236,.25);color:var(--cyan-ink)} .mood.ok{background:var(--yel);color:var(--dark)}
+  .mood.meh{background:rgba(176,124,116,.3);color:var(--ink)} .mood.bad{background:var(--lred);color:#fff}
   .form input::placeholder{color:#a87a72}
   .btn{flex:none;border:0;font:inherit;font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;padding:0 16px;height:44px;background:var(--yel);color:var(--dark);
     clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
@@ -936,6 +947,8 @@
     S = s; lastSync = Date.now(); offline = false;
     store.set('capri-life', S); store.set('capri-life-at', lastSync);
     if (j.result && myRids[j.rid]) { delete myRids[j.rid]; toast(j.result, /PR|✓|unlock/i.test(j.result) ? '' : 'c'); }
+    if (before && before.level && S.level > before.level) toast('LEVEL UP · BODY ' + S.level, '');
+    if (before && before.cred && S.cred > before.cred) toast('STREET CRED UP · ' + S.cred, 'c');
     if (before && before.ladders) {
       for (const L of S.ladders) {
         const o = before.ladders.find(x => x.id === L.id);
@@ -1001,8 +1014,8 @@
     }
     const done = S.habits.filter(x => habitDone(x)).length, left = S.monthIn - S.monthOut;
     const got = S.ladders.reduce((a, L) => a + L.reached, 0);
-    o += `<div class="strip"><div><b>LV ${S.level}</b><span>LEVEL</span></div><div><b class="c">${num(S.xp)}</b><span>XP</span></div><div><b>${usd(left)}</b><span>LEFT THIS MONTH</span></div></div>`;
-    o += `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--dim);letter-spacing:1px"><span>LEVEL ${S.level}</span><span class="mono">${num(S.xp)} / ${num(S.nextXp)} XP</span></div>${seg(S.levelProgress, 24, 'tall')}`;
+    o += `<div class="strip"><div><b>LV ${S.level}</b><span>BODY</span></div><div><b class="c">${S.cred || 1}</b><span>STREET CRED</span></div><div><b>${usd(left)}</b><span>LEFT THIS MONTH</span></div></div>`;
+    o += rankBars();
     o += `<div class="cards">
       <button class="card cut sel" data-a="go" data-v="budget" style="font:inherit;color:inherit"><div class="hb">BUDGET</div>${ICON.budget}<div class="v">${usd(left)}</div><div class="s">${S.limit > 0 ? Math.round(S.monthOut / S.limit * 100) + '% OF LIMIT' : 'LEFT THIS MONTH'}</div></button>
       <button class="card cut" data-a="go" data-v="habits" style="font:inherit;color:inherit"><div class="hb">HABITS</div>${ICON.habits}<div class="v">${done}/${S.habits.length}</div><div class="s">DONE TODAY</div></button>
@@ -1010,7 +1023,9 @@
       <button class="card cut" data-a="go" data-v="ach" style="font:inherit;color:inherit"><div class="hb">ACHIEVEMENTS</div>${ICON.ach}<div class="v">${got}</div><div class="s">UNLOCKED</div></button></div>`;
     o += G.on ? `<button class="bigbtn" data-a="tab" data-v="gym">${ICON.fitness}BACK TO GYM · ${Math.round((Date.now() - G.start) / 60000)} MIN</button>`
               : `<button class="bigbtn" data-a="gymstart">${ICON.fitness}START GYM MODE</button>`;
+    o += focusHtml();
     o += head("TODAY'S HABITS", done + '/' + S.habits.length) + habitGrid(todayKey());
+    if (!jEntry(todayKey()) && new Date().getHours() >= 17) o += head('NIGHT LOG', '+15 CRED') + journalEditor(todayKey());
     const nx = nextUnlocks(3);
     if (nx.length) {
       o += head('NEXT UNLOCKS');
@@ -1027,14 +1042,61 @@
     }).join('') + '</div>';
   }
 
+  // ---------------------------------------------------------- BODY / MIND, focus, night log
+  const rankBars = () => `<div class="ranks"><div><div class="rk"><span>LEVEL ${S.level} // BODY</span><span>${num(Math.max(0, S.nextXp - S.xp))} TO ${S.level + 1}</span></div>${seg(S.levelProgress, 12, 'tall')}</div>` +
+    `<div><div class="rk c"><span>CRED ${S.cred || 1} // MIND</span><span>${num(Math.max(0, (S.credNext || 0) - (S.credXp || 0)))} TO ${(S.cred || 1) + 1}</span></div>${seg(S.credProgress, 12, 'tall c')}</div></div>`;
+  function focusLeftTxt() { if (!S || !S.focusOn) return ''; if (!S.focusUntil) return '∞'; return mmss(Math.max(0, (S.focusUntil - Date.now()) / 1000)); }
+  function focusHtml() {
+    if (S.focusOn) return head('FOCUS MODE', 'LIVE') + `<div class="panel cut c" style="text-align:center"><div class="mono" id="fLeft" style="font-size:46px;color:var(--cyan-ink);text-shadow:0 0 14px rgba(94,226,236,.45)">${focusLeftTxt()}</div><div class="dim" style="font-size:11px;letter-spacing:1.5px">LOCKED IN ON THE LAPTOP · ${S.focusToday || 0} MIN TODAY</div><button class="bigbtn red" data-a="fstop" style="height:46px;font-size:16px">STOP FOCUS</button></div>`;
+    return head('FOCUS MODE', (S.focusToday || 0) + ' MIN TODAY') + `<div class="chips">${[25, 50, 90].map(m => `<button class="chip cy" data-a="fstart" data-v="${m}">${m} MIN</button>`).join('')}<button class="chip cy" data-a="fstart" data-v="0">UNTIL I STOP</button></div>` +
+      `<div class="dim" style="font-size:11px;margin-top:6px">Starts focus on your laptop. Capri guards you from distractions and pays out street cred${S.focusScore ? ' · LAST SESSIONS ' + S.focusScore + '% LOCKED IN' : ''}.</div>`;
+  }
+  const MOODS = ['great', 'good', 'ok', 'meh', 'bad'];
+  const jMood = {}, jDraft = {};
+  let jEdit = '';
+  const jEntry = d => (S && S.journal || []).find(j => j.day === d);
+  const fmtDay = d => new Date(d + 'T12:00').toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric'}).toUpperCase();
+  function journalEditor(day) {
+    const e = jEntry(day) || {mood: '', text: ''};
+    if (jMood[day] === undefined) jMood[day] = e.mood || '';
+    const txt = jDraft[day] !== undefined ? jDraft[day] : e.text;
+    return `<div class="panel cut c"><div class="chips">${MOODS.map(m => `<button class="chip ${jMood[day] === m ? 'on' : ''}" data-a="jmood" data-v="${m}" data-d="${day}">${m.toUpperCase()}</button>`).join('')}</div>` +
+      `<div class="form"><textarea id="jt_${day}" rows="4" maxlength="1500" placeholder="How was today? What happened, what's on your mind...">${esc(txt)}</textarea></div>` +
+      `<div class="form" style="justify-content:flex-end">${e.text ? `<button class="btn ghost" data-a="jdel" data-v="${day}">DELETE</button>` : ''}<button class="btn cy" data-a="jsave" data-v="${day}">SAVE LOG</button></div></div>`;
+  }
+  function subJournal() {
+    const today = todayKey(), ed = jEdit || today, list = (S.journal || []);
+    let o = `<div class="stats">${stat('NIGHT LOGS', S.journalCount || 0, 'c')}${stat('STREET CRED', S.cred || 1, 'c')}${stat('FOCUS / WEEK', (S.focusWeek || 0) + ' MIN', 'y')}</div>`;
+    o += head(ed === today ? "TONIGHT'S LOG" : 'EDITING · ' + fmtDay(ed), ed === today && !jEntry(today) ? '+15 CRED' : '') + journalEditor(ed);
+    if (ed !== today) o += `<button class="chip" data-a="jedit" data-v="${today}" style="margin-top:8px">BACK TO TODAY</button>`;
+    o += head('PAST NIGHTS', list.length ? list.length + ' SAVED' : '');
+    if (!list.length) o += '<div class="hint2">Nothing yet. Write tonight\'s log above, or just tell Capri how your day went.</div>';
+    for (const j of list) {
+      if (j.day === ed) continue;
+      o += `<div class="jrow" data-a="jedit" data-v="${esc(j.day)}"><div class="top"><span>${fmtDay(j.day)}</span>${j.mood ? `<span class="mood ${esc(j.mood)}">${esc(j.mood.toUpperCase())}</span>` : ''}</div><p>${esc(j.text)}</p></div>`;
+    }
+    return o;
+  }
+  function watchHtml(g) {
+    if (g.watch) {
+      const url = /^https?:\/\//i.test(g.url || '') ? g.url : '';
+      let o = g.price
+        ? `<div class="mono" style="font-size:13px;margin-top:8px"><span class="dim">PRICE ·</span> <span class="yel">${usd(g.price)}</span>${g.store ? ' @ ' + esc(g.store.toUpperCase()) : ''}${g.low && g.low < g.price ? ' <span class="dim">· LOW ' + usd(g.low) + '</span>' : ''}${g.saved >= g.price ? ' <span class="pos">· YOU CAN BUY IT</span>' : ''}</div><div class="dim mono" style="font-size:10px">WATCHING ${esc(g.watch.toUpperCase())} · CHECKED ${ago(g.checked)}</div>`
+        : `<div class="dim mono" style="font-size:11px;margin-top:8px">WATCHING ${esc(g.watch.toUpperCase())} · FIRST CHECK SOON</div>`;
+      return o + `<div class="btns">${url ? `<a class="chip cy" href="${esc(url)}" target="_blank" rel="noopener" style="text-decoration:none">OPEN DEAL</a>` : ''}<button class="chip" data-a="wcheck" data-v="${esc(g.id)}">CHECK NOW</button><button class="chip" data-a="woff" data-v="${esc(g.id)}">STOP WATCH</button></div>`;
+    }
+    return `<div class="form" style="margin-top:8px"><input id="gw_${esc(g.id)}" placeholder="watch the price: exact item" maxlength="100"><button class="btn ghost" data-a="wset" data-v="${esc(g.id)}">WATCH</button></div>`;
+  }
+
   // ---------------------------------------------------------- LIFE
   function pageLife() {
-    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['fitness', 'FITNESS'], ['ach', 'ACHIEVEMENTS']];
-    let o = `<div class="ltitle">LIFE PLANNER</div><div class="lsub">// BUDGET · HABITS · FITNESS · ACHIEVEMENTS</div>${syncHtml()}`;
+    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['ach', 'ACHIEVEMENTS']];
+    let o = `<div class="ltitle">LIFE PLANNER</div><div class="lsub">// BODY · MIND · MONEY · ACHIEVEMENTS</div>${syncHtml()}`;
     o += `<div class="chips" style="margin-top:14px">${subs.map(([k, t]) => `<button class="chip ${sub === k ? 'on' : ''}" data-a="sub" data-v="${k}">${t}</button>`).join('')}</div>`;
     if (!S) return o + '<div class="panel cut" style="margin-top:16px"><div class="hint2">Waiting for your laptop to send your planner...</div></div>';
     if (sub === 'budget') o += subBudget();
     else if (sub === 'habits') o += subHabits();
+    else if (sub === 'journal') o += subJournal();
     else if (sub === 'fitness') o += subFitness();
     else o += subAch();
     return o;
@@ -1058,7 +1120,7 @@
       const f = g.target ? g.saved / g.target : 0;
       o += `<div class="panel cut goal ${g.done ? 'c' : ''}"><span class="tag">${esc(g.name.toUpperCase())}</span><button class="x" data-a="del" data-k="goaldel" data-v="${esc(g.id)}" style="position:absolute;right:6px;top:2px">×</button>
         <div class="amt">${usd(g.saved)} <small>/ ${usd(g.target)}${g.due ? ' · BY ' + new Date(g.due).toLocaleDateString('en-US', {month: 'short', year: 'numeric'}).toUpperCase() : ''}</small></div>${seg(f, 20, g.done ? 'c' : '')}
-        ${g.done ? '<div class="pos" style="font-size:12px">GOAL REACHED ✓</div>' : `<div class="btns"><button class="chip" data-a="gadd" data-v="${esc(g.id)}" data-n="10">+$10</button><button class="chip" data-a="gadd" data-v="${esc(g.id)}" data-n="50">+$50</button><button class="chip" data-a="gadd" data-v="${esc(g.id)}" data-n="100">+$100</button><input id="ga_${esc(g.id)}" type="number" inputmode="decimal" placeholder="$" style="width:70px;background:#2c1018;border:1.3px solid rgba(236,46,58,.6);color:#ffe4dc;font:inherit;padding:0 8px;-webkit-user-select:text"><button class="chip cy" data-a="gaddc" data-v="${esc(g.id)}">ADD</button></div>`}</div>`;
+        ${g.done ? '<div class="pos" style="font-size:12px">GOAL REACHED ✓</div>' : `<div class="btns"><button class="chip" data-a="gadd" data-v="${esc(g.id)}" data-n="10">+$10</button><button class="chip" data-a="gadd" data-v="${esc(g.id)}" data-n="50">+$50</button><button class="chip" data-a="gadd" data-v="${esc(g.id)}" data-n="100">+$100</button><input id="ga_${esc(g.id)}" type="number" inputmode="decimal" placeholder="$" style="width:70px;background:#2c1018;border:1.3px solid rgba(236,46,58,.6);color:#ffe4dc;font:inherit;padding:0 8px;-webkit-user-select:text"><button class="chip cy" data-a="gaddc" data-v="${esc(g.id)}">ADD</button></div>`}${g.done ? '' : watchHtml(g)}</div>`;
     }
     o += `<div class="form"><input id="gName" placeholder="new goal (e.g. Car)" maxlength="40"><input id="gAmt" class="w2" type="number" inputmode="decimal" placeholder="$ target"><button class="btn" data-a="goalnew">ADD</button></div>`;
     o += head('BILLS & SUBSCRIPTIONS', usd(S.bills.reduce((a, b) => a + b.amt, 0)) + '/MO');
@@ -1284,7 +1346,7 @@
   const PAGES = {home: ['vHome', 'homeP', pageHome], life: ['vLife', 'lifeP', pageLife], gym: ['vGym', 'gymP', pageGym]};
   function render() {
     const ae = document.activeElement;
-    if (ae && ae.tagName === 'INPUT' && ae.closest('.lp')) { pendingRender = true; return; }
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.closest('.lp')) { pendingRender = true; return; }
     pendingRender = false;
     const p = PAGES[tab]; if (!p) return;
     const el = $(p[1]), top = el.scrollTop;
@@ -1355,6 +1417,26 @@
         render(); return;
       }
       case 'achf': achFilter = v; render(); return;
+      case 'fstart': act('focus', v); if (S) { S.focusOn = true; S.focusUntil = +v ? Date.now() + v * 60000 : 0; } render(); return;
+      case 'fstop': act('focusstop', ''); if (S) S.focusOn = false; render(); return;
+      case 'jmood': { const d = b.dataset.d, ta = $('jt_' + d); if (ta) jDraft[d] = ta.value; jMood[d] = jMood[d] === v ? '' : v; render(); return; }
+      case 'jedit': { if (tab !== 'life') { sub = 'journal'; setTab('life'); } jEdit = v === todayKey() ? '' : v; render(); $('lifeP').scrollTop = 0; return; }
+      case 'jsave': case 'jdel': {
+        const ta = $('jt_' + v), text = a === 'jdel' ? '' : (ta ? ta.value.trim() : ''), mood = a === 'jdel' ? '' : (jMood[v] || '');
+        if (a === 'jsave' && !text && !mood) { toast('WRITE A LINE OR PICK A MOOD', 'r'); return; }
+        if (a === 'jdel') { const k = 'jdel' + v; if (!armed[k]) { armed[k] = 1; b.textContent = 'SURE?'; setTimeout(() => { delete armed[k]; if (b.isConnected) b.textContent = 'DELETE'; }, 2500); return; } delete armed[k]; }
+        act('journalday', v + ' ' + (mood || '-') + '\n' + text);
+        if (S) {
+          S.journal = (S.journal || []).filter(j => j.day !== v);
+          if (text || mood) { S.journal.push({day: v, mood, text}); S.journal.sort((x, y) => x.day < y.day ? 1 : -1); }
+          S.journalCount = S.journal.length;
+        }
+        delete jDraft[v]; delete jMood[v]; if (ta) ta.blur(); jEdit = '';
+        render(); return;
+      }
+      case 'wset': { const n = val('gw_' + v); if (!n) return; act('watch', v + ' | ' + n); const g = S && S.goals.find(x => x.id === v); if (g) g.watch = n; render(); return; }
+      case 'woff': { act('watch', v + ' | off'); const g = S && S.goals.find(x => x.id === v); if (g) { g.watch = ''; delete g.price; } render(); return; }
+      case 'wcheck': act('pricecheck', v); return;
       case 'grp': selGroup = selGroup === v ? '' : v; render(); return;
       case 'sex': act('sex', v, true); if (S) S.sex = v; render(); return;
       case 'exnew': { const n = val('exName'), g = val('exGrp') || 'chest'; if (!n) return; act('lift', g + ': ' + n); return; }
@@ -1382,13 +1464,14 @@
   }
   ['homeP', 'lifeP', 'gymP'].forEach(id => $(id).addEventListener('click', onTap));
   document.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' || !e.target.closest || !e.target.closest('.lp')) return;
+    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.closest('.lp')) return;
     const form = e.target.closest('.form'); const btn = form && form.querySelector('[data-a]');
     if (btn) { e.preventDefault(); e.target.blur(); setTimeout(() => btn.click(), 60); }
   });
 
   setTab(PAGES[tab] || tab === 'call' ? tab : 'home');
   setInterval(gymTick, 500);
+  setInterval(() => { const f = $('fLeft'); if (f) f.textContent = focusLeftTxt(); }, 1000);
   setInterval(() => { if (tab !== 'call') drawSync(); }, 30000);
   if (cfg) { listen(); pollLatest().then(askSnapshot); flush(); }
 })();
