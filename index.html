@@ -343,6 +343,18 @@
     padding:12px 14px;clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);transform:translateY(-30px);opacity:0;visibility:hidden;transition:transform .25s ease,opacity .25s,visibility .25s;pointer-events:none}
   .toast.show{transform:none;opacity:1;visibility:visible}
   .toast.c{background:var(--cyan);color:#06181b} .toast.r{background:var(--lred);color:#fff}
+  .tbx{flex:none;width:26px;height:26px;border:1.5px solid var(--cyan);background:none;color:transparent;display:grid;place-items:center;padding:0}
+  .tbx svg{width:16px;height:16px} .tbx.on{background:var(--cyan);color:var(--dark)}
+  .sel{background:#1c0a0e;border:1px solid rgba(236,46,58,.6);color:var(--ink);font:inherit;font-size:13px;padding:0 6px;max-width:42%}
+  .qq{font-size:19px;line-height:1.35;margin:12px 0 14px;white-space:pre-wrap;font-weight:600}
+  .qa{font-size:16px;line-height:1.4;color:var(--cyan-ink);border-top:1px dashed rgba(94,226,236,.55);padding-top:10px;white-space:pre-wrap}
+  .rec{color:var(--lred);font-family:"Chakra Petch",sans-serif;letter-spacing:1px;animation:recb 1.4s infinite}
+  @keyframes recb{50%{opacity:.45}}
+  .sbars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;height:92px;position:relative;align-items:end}
+  .sbars>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+  .sbars i{display:block;width:100%;min-height:2px;background:rgba(236,46,58,.2)}
+  .sbars span{font-family:"Share Tech Mono",monospace;font-size:10px;color:var(--dim);margin-top:3px}
+  .sbars em{position:absolute;left:0;right:0;bottom:calc(16px + (100% - 16px) * .8);border-top:1px dashed rgba(252,236,12,.6)}
 </style>
 </head>
 <body>
@@ -388,11 +400,13 @@
     <div class="view" id="vHome"><div class="lp" id="homeP"></div></div>
     <div class="view" id="vLife"><div class="lp" id="lifeP"></div></div>
     <div class="view" id="vGym"><div class="lp" id="gymP"></div></div>
+    <div class="view" id="vSchool"><div class="lp" id="schoolP"></div></div>
   </div>
   <nav class="tabbar">
     <button data-t="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11 12 4l9 7M5 10v10h5v-6h4v6h5V10"/></svg>HOME</button>
     <button data-t="life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>LIFE</button>
     <button data-t="gym"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h2M20 12h2M6 8v8M18 8v8M4 9.5v5M20 9.5v5M6 12h12"/></svg>GYM</button>
+    <button data-t="school"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 9 12 4l10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/></svg>SCHOOL</button>
     <button data-t="call"><span class="live" id="liveDot"></span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>CALL</button>
   </nav>
 </div>
@@ -1040,6 +1054,8 @@
     o += G.on ? `<button class="bigbtn" data-a="tab" data-v="gym">${ICON.fitness}BACK TO GYM · ${Math.round((Date.now() - G.start) / 60000)} MIN</button>`
               : `<button class="bigbtn" data-a="gymstart">${ICON.fitness}START GYM MODE</button>`;
     o += planHtml();
+    if ((S.cards || []).length) o += `<button class="bigbtn ghost" data-a="qstart">${ICON.ach}REVIEW ${S.cards.length} FLASHCARDS</button>`;
+    o += sleepHtml(false);
     o += focusHtml();
     o += head("TODAY'S HABITS", done + '/' + S.habits.length) + habitGrid(todayKey());
     if (!jEntry(todayKey()) && new Date().getHours() >= 17) o += head('NIGHT LOG', '+15 CRED') + journalEditor(todayKey());
@@ -1068,7 +1084,7 @@
     return head('FOCUS MODE', (S.focusToday || 0) + ' MIN TODAY') + `<div class="chips">${[25, 50, 90].map(m => `<button class="chip cy" data-a="fstart" data-v="${m}">${m} MIN</button>`).join('')}<button class="chip cy" data-a="fstart" data-v="0">UNTIL I STOP</button></div>` +
       `<div class="dim" style="font-size:11px;margin-top:6px">Starts focus on your laptop. Capri guards you from distractions and pays out street cred${S.focusScore ? ' · LAST SESSIONS ' + S.focusScore + '% LOCKED IN' : ''}.</div>`;
   }
-  const KCOL = {class: '#fcec0c', task: '#5ee2ec', gym: '#ec2e3a', meal: '#b07c74', habits: '#ec3668', log: '#96f0f6', wind: '#8a6cff'};
+  const KCOL = {cards: '#ecac3a', class: '#fcec0c', task: '#5ee2ec', gym: '#ec2e3a', meal: '#b07c74', habits: '#ec3668', log: '#96f0f6', wind: '#8a6cff'};
   const hm = ms => new Date(ms).toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'}).replace(':00', '').replace(' ', '').toLowerCase();
   function planHtml() {
     const P = S.plan || [];
@@ -1127,7 +1143,7 @@
 
   // ---------------------------------------------------------- LIFE
   function pageLife() {
-    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['ach', 'ACHIEVEMENTS']];
+    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['ach', 'ACHIEVEMENTS'], ['shop', 'SHOP']];
     let o = `<div class="ltitle">LIFE PLANNER</div><div class="lsub">// BODY · MIND · MONEY · ACHIEVEMENTS</div>${syncHtml()}`;
     o += `<div class="chips" style="margin-top:14px">${subs.map(([k, t]) => `<button class="chip ${sub === k ? 'on' : ''}" data-a="sub" data-v="${k}">${t}</button>`).join('')}</div>`;
     if (!S) return o + '<div class="panel cut" style="margin-top:16px"><div class="hint2">Waiting for your laptop to send your planner...</div></div>';
@@ -1135,6 +1151,7 @@
     else if (sub === 'habits') o += subHabits();
     else if (sub === 'journal') o += subJournal();
     else if (sub === 'fitness') o += subFitness();
+    else if (sub === 'shop') o += subShop();
     else o += subAch();
     return o;
   }
@@ -1192,6 +1209,7 @@
       o += head('STREAKS');
       for (const h of S.habits) o += `<div class="row"><div class="t"><b>${esc(h.name)}</b><small>BEST ${h.best} DAYS</small></div><span class="a yel">${h.streak} 🔥</span><button class="x" data-a="del" data-k="habitdel" data-v="${esc(h.id)}">×</button></div>`;
     }
+    o += sleepHtml(true);
     o += head('ADD A HABIT') + `<div class="form"><input id="hName" placeholder="e.g. Drink water" maxlength="40"><button class="btn" data-a="habnew">ADD</button></div>`;
     const have = S.habits.map(h => h.name.toLowerCase());
     const pre = PRESETS.filter(p => have.indexOf(p.toLowerCase()) < 0);
@@ -1330,6 +1348,123 @@
     return o;
   }
 
+  // ---------------------------------------------------------- SCHOOL
+  let quiz = null;            // {list, i, show, right, wrong}
+  const dayBit = d => 1 << ((d.getDay() + 6) % 7);
+  const atTime = (d, hhmm) => { const p = (hhmm || '0:0').split(':'); const x = new Date(d); x.setHours(+p[0] || 0, +p[1] || 0, 0, 0); return x.getTime(); };
+  function classesOn(d) { const sc = S.school || {}; return (sc.classes || []).filter(c => c.days & dayBit(d)).sort((a, b) => a.start < b.start ? -1 : 1); }
+  function classNow() { const now = Date.now(), d = new Date(); return classesOn(d).find(c => now >= atTime(d, c.start) - 15 * 60000 && now <= atTime(d, c.end)) || null; }
+  function dueTxt(ms) {
+    if (!ms) return 'NO DATE';
+    const d = new Date(ms), n = new Date();
+    const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5);
+    const t = hm(ms).toUpperCase();
+    if (ms < Date.now()) return days >= 0 ? 'WAS DUE ' + t : (-days) + (days === -1 ? ' DAY' : ' DAYS') + ' LATE';
+    if (days === 0) return 'TODAY ' + t;
+    if (days === 1) return 'TOMORROW ' + t;
+    if (days < 7) return d.toLocaleDateString('en-US', {weekday: 'short'}).toUpperCase() + ' ' + t;
+    return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}).toUpperCase();
+  }
+  function lectureHtml() {
+    const L = S.lecture || {};
+    if (L.on) return `<div class="panel cut y" style="margin-top:14px"><b class="rec">● RECORDING NOTES · ${esc((L.course || '').toUpperCase())}</b><div class="dim mono" style="font-size:11px;margin-top:4px">${Math.max(0, Math.round((Date.now() - L.since) / 60000))} MIN · STOPS ${hm(L.stopAt).toUpperCase()} · AUDIO IS DELETED AFTER IT'S TRANSCRIBED</div><button class="bigbtn red" data-a="lec" data-v="stop" style="height:44px;font-size:15px">STOP NOTES</button></div>`;
+    if (L.writing) return `<div class="panel cut c" style="margin-top:14px"><b>WRITING UP YOUR NOTES...</b><div class="dim" style="font-size:11px">She'll ping you when the notes and flashcards are ready.</div></div>`;
+    const cl = classNow();
+    return cl ? `<button class="bigbtn ghost" data-a="lec" data-v="start ${esc(cl.id)}">${ICON.mic}TAKE NOTES · ${esc(cl.course.toUpperCase())}</button><div class="dim" style="font-size:11px;margin-top:4px">Only if your professor's okay with recording. The laptop records, then writes notes + flashcards.</div>` : '';
+  }
+  function quizHtml() {
+    const c = quiz.list[quiz.i];
+    if (!c) return head('FLASHCARDS', 'DONE') + `<div class="panel cut c" style="text-align:center"><div class="mono" style="font-size:40px;color:var(--cyan-ink)">${quiz.right}<span class="dim" style="font-size:18px"> RIGHT</span></div><div class="dim mono" style="font-size:12px">${quiz.wrong} TO PRACTICE AGAIN · +${quiz.right * 2 + quiz.wrong * 2} CRED</div><button class="bigbtn" data-a="qend" style="height:46px;font-size:16px">FINISH</button></div>`;
+    return head('FLASHCARDS', (quiz.i + 1) + ' / ' + quiz.list.length) + `<div class="panel cut c"><div class="dim mono" style="font-size:10px;letter-spacing:1px">${esc((c.deck || '').toUpperCase())}${c.box ? ' · BOX ' + c.box : ' · NEW'}</div><div class="qq">${esc(c.q)}</div>` +
+      (quiz.show ? `<div class="qa">${esc(c.a)}</div><div class="form" style="margin-top:12px"><button class="btn ghost" data-a="qgrade" data-v="0" style="flex:1">AGAIN</button><button class="btn cy" data-a="qgrade" data-v="1" style="flex:1">GOT IT</button></div>`
+                 : `<button class="bigbtn" data-a="qshow" style="height:48px;font-size:16px">SHOW ANSWER</button>`) +
+      `</div><button class="chip" data-a="qend" style="margin-top:8px">END · ${quiz.right} RIGHT</button>`;
+  }
+  function taskRow(t) {
+    const late = t.due && t.due < Date.now();
+    const tag = (t.kind === 'exam' ? 'EXAM · ' : t.parent ? 'STEP · ' : '') + (t.course ? esc(t.course.toUpperCase()) + ' · ' : '');
+    return `<div class="row"><button class="tbx" data-a="tdone" data-v="${esc(t.id)}">${ICON.check}</button><div class="t"><b>${esc(t.title)}</b><small class="${late ? 'neg' : ''}">${tag}${dueTxt(t.due)}</small></div>` +
+      (t.big ? `<button class="chip cy" data-a="tbreak" data-v="${esc(t.id)}" style="padding:4px 8px;font-size:11px">STEPS</button>` : '') + `</div>`;
+  }
+  function pageSchool() {
+    let o = `<div class="ltitle">SCHOOL</div><div class="lsub">// CLASSES · HOMEWORK · STUDY · GRADES</div>${syncHtml()}`;
+    if (!S || !S.school) return o + '<div class="panel cut" style="margin-top:16px"><div class="hint2">Waiting for your laptop to send your classes and homework...</div></div>';
+    const sc = S.school, now = Date.now(), endToday = new Date(); endToday.setHours(23, 59, 59, 999);
+    const open = sc.tasks || [];
+    const over = open.filter(t => t.due && t.due < now), today = open.filter(t => t.due >= now && t.due <= endToday.getTime());
+    const week = open.filter(t => t.due > endToday.getTime() && t.due < now + 7 * 864e5), later = open.filter(t => !t.due || t.due >= now + 7 * 864e5);
+    o += lectureHtml();
+    if (quiz) return o + quizHtml();
+    o += `<div class="stats">${stat('DUE TODAY', today.length, today.length ? 'y' : '')}${stat('OVERDUE', over.length, over.length ? 'r' : '')}${stat('CARDS DUE', S.cardsDue || 0, 'c')}</div>`;
+    if ((S.cards || []).length) o += `<button class="bigbtn" data-a="qstart">${ICON.ach}REVIEW ${S.cards.length}${S.cardsDue > S.cards.length ? '+' : ''} FLASHCARDS</button>`;
+    const cls = classesOn(new Date());
+    o += head("TODAY'S CLASSES", cls.length ? cls.length + '' : 'NONE');
+    for (const c of cls) {
+      const s = atTime(new Date(), c.start), e = atTime(new Date(), c.end), on = now >= s && now <= e;
+      o += `<div class="prow ${on ? 'now' : ''} ${e < now ? 'off' : ''}" style="--k:#fcec0c"><span class="tm">${hm(s)}<br><span class="dim">${hm(e)}</span></span><span class="tl">${esc(c.course)}<small>${on ? 'NOW' : e < now ? 'DONE' : 'CLASS'}${c.room ? ' · ' + esc(c.room.toUpperCase()) : ''}</small></span></div>`;
+    }
+    if (over.length) { o += head('OVERDUE', over.length + ''); for (const t of over.slice(0, 8)) o += taskRow(t); if (over.length > 8) o += `<div class="dim mono" style="font-size:11px">+ ${over.length - 8} MORE</div>`; }
+    o += head('DUE TODAY', today.length + ''); if (!today.length) o += '<div class="hint2">Nothing due today. 😎</div>'; for (const t of today) o += taskRow(t);
+    if (week.length) { o += head('THIS WEEK', week.length + ''); for (const t of week) o += taskRow(t); }
+    if (later.length) { o += head('LATER', later.length + ''); for (const t of later.slice(0, 12)) o += taskRow(t); }
+    const names = (sc.courses || []).map(c => c.name);
+    o += head('ADD HOMEWORK') + `<div class="form"><input id="tTitle" placeholder="e.g. Essay draft" maxlength="120"></div><div class="form"><input id="tDue" type="datetime-local"><select id="tCourse" class="sel"><option value="">CLASS</option>${names.map(n => `<option>${esc(n)}</option>`).join('')}</select><button class="btn" data-a="tadd">ADD</button></div>`;
+    if ((sc.done || []).length) { o += head('JUST FINISHED'); for (const t of sc.done) o += `<div class="row"><button class="tbx on" data-a="tundo" data-v="${esc(t.id)}">${ICON.check}</button><div class="t"><b style="text-decoration:line-through;opacity:.7">${esc(t.title)}</b><small>${t.course ? esc(t.course.toUpperCase()) + ' · ' : ''}${ago(t.doneAt)}</small></div></div>`; }
+    const cs = (sc.courses || []).filter(c => c.pct >= 0);
+    o += head('GRADES', sc.gpa >= 0 ? 'GPA ' + sc.gpa.toFixed(2) : '');
+    if (!cs.length) o += '<div class="hint2">No grades yet. Add them in the Hub\'s COLLEGE page, or tell Capri.</div>';
+    for (const c of cs) o += `<div class="row"><div class="t"><b>${esc(c.name)}</b><small>${c.grades} GRADES · ${num(c.credits)} CR</small></div><span class="a mono ${c.pct >= 80 ? 'pos' : c.pct >= 70 ? 'yel' : 'neg'}" style="font-size:16px">${esc(c.letter)} · ${num(c.pct)}%</span></div>`;
+    o += `<div class="dim mono" style="font-size:11px;margin-top:6px">STUDIED ${sc.studyToday || 0} MIN TODAY · ${sc.studyWeek || 0} MIN THIS WEEK · ${S.cardReviews || 0} CARDS REVIEWED</div>`;
+    const rd = S.readings || [];
+    if (rd.length) {
+      o += head('READINGS & NOTES', rd.length + '');
+      for (const r of rd) o += `<div class="row"><div class="t"><b>${esc(r.title)}</b><small>${ago(r.at)}${r.summary ? ' · ' + esc(r.summary) : ''}</small></div>${r.cards ? '<span class="a mono pos" style="font-size:11px">CARDS ✓</span>' : `<button class="chip cy" data-a="rcards" data-v="${esc(r.id)}" style="padding:4px 8px;font-size:11px">MAKE CARDS</button>`}</div>`;
+    }
+    return o;
+  }
+
+  // ---------------------------------------------------------- sleep
+  function sleepBars(n) {
+    let o = '<div class="panel cut"><div class="sbars">';
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const x = n.find(z => z.day === dayKey(d)), h = x ? Math.min(10, x.hours) : 0;
+      const col = !x ? '' : x.hours >= 7 ? 'var(--yel)' : x.hours >= 6 ? 'var(--amber)' : 'var(--lred)';
+      o += `<div><i style="height:${h * 10}%;background:${col}"></i><span class="${i === 0 ? 'yel' : ''}">${'SMTWTFS'[d.getDay()]}</span></div>`;
+    }
+    return o + '<em></em></div><div class="dim mono" style="font-size:10px;margin-top:4px">LAST 14 NIGHTS · LINE = 8 H · 7H+ = BODY XP</div></div>';
+  }
+  function sleepHtml(full) {
+    const L = S.sleep; if (!L) return '';
+    const n = L.nights || [], last = n.find(z => z.day === todayKey());
+    let o = head('SLEEP', L.bedAt ? 'IN BED SINCE ' + hm(L.bedAt).toUpperCase() : L.tonight ? 'BED BY ' + hm(L.tonight).toUpperCase() : '');
+    o += `<div class="stats">${stat('LAST NIGHT', last ? num(last.hours) + ' H' : '--', 'y')}${stat('7-NIGHT AVG', L.avg7 ? num(L.avg7) + ' H' : '--', 'c')}${stat('BEDTIME SWING', L.spread ? '± ' + L.spread + ' MIN' : '--')}</div>`;
+    if (full) o += sleepBars(n);
+    if (L.bedAt) o += `<div class="chips" style="margin-top:8px"><button class="chip on" data-a="slp" data-v="up">I'M UP</button><button class="chip" data-a="slp" data-v="cancel">CANCEL</button></div>`;
+    else {
+      o += `<div class="chips" style="margin-top:8px"><button class="chip cy" data-a="slp" data-v="bed">GOING TO BED</button></div>`;
+      if (!last || full) o += `<div class="form"><input id="slpH" type="number" inputmode="decimal" step="0.25" min="1" max="16" placeholder="or log last night: hours slept"><button class="btn ghost" data-a="slph">LOG</button></div>`;
+    }
+    return o;
+  }
+
+  // ---------------------------------------------------------- rewards shop
+  function subShop() {
+    const R = S.rewards;
+    if (!R) return '<div class="hint2" style="margin-top:12px">The shop shows up once your laptop syncs.</div>';
+    let o = `<div class="strip"><div><b>${num(R.body)}</b><span>BODY XP TO SPEND</span></div><div><b class="c">${num(R.cred)}</b><span>CRED TO SPEND</span></div></div>`;
+    o += head('REWARDS SHOP', 'LEVELS NEVER DROP');
+    for (const r of R.items) {
+      const body = r.kind === 'body', bal = body ? R.body : R.cred, can = bal >= r.cost;
+      o += `<div class="row"><div class="t"><b>${esc(r.name)}</b><small style="color:${body ? 'var(--yel)' : 'var(--cyan-ink)'}">${num(r.cost)} ${body ? 'BODY XP' : 'CRED'}${r.last ? ' · LAST ' + ago(r.last) : ''}</small></div>` +
+        (can ? `<button class="chip ${body ? 'on' : 'cy'}" data-a="redeem" data-v="${esc(r.id)}" style="padding:5px 9px;font-size:11px">CASH IN</button>` : `<span class="a dim mono" style="font-size:11px">${num(r.cost - bal)} TO GO</span>`) +
+        `<button class="x" data-a="del" data-k="rewarddel" data-v="${esc(r.id)}">×</button></div>`;
+    }
+    o += head('ADD A REWARD') + `<div class="form"><input id="rwName" placeholder="e.g. New sneakers" maxlength="32"><input id="rwCost" type="number" inputmode="numeric" placeholder="cost" style="max-width:84px"></div><div class="chips" style="margin-top:6px"><button class="chip" data-a="rwnew" data-v="body">+ FOR BODY XP</button><button class="chip cy" data-a="rwnew" data-v="cred">+ FOR CRED</button></div>`;
+    if ((R.log || []).length) { o += head('CASHED IN'); for (const x of R.log) o += `<div class="row"><div class="t"><b>${esc(x.name)}</b><small>${ago(x.at)}</small></div><span class="a mono ${x.kind === 'body' ? 'yel' : 'pos'}">-${num(x.cost)}</span></div>`; }
+    return o;
+  }
+
   // ---------------------------------------------------------- GYM
   const lifts = () => (S ? S.lifts : []);
   const findLift = n => { n = (n || '').toLowerCase().trim(); if (!n) return null; const ls = lifts(); return ls.find(l => l.name.toLowerCase() === n) || ls.find(l => l.name.toLowerCase().indexOf(n) >= 0) || ls.find(l => n.indexOf(l.name.toLowerCase()) >= 0) || ls.find(l => l.name.toLowerCase().replace(/ press| up/g, '').split(' ').some(w => w.length > 2 && n.indexOf(w) >= 0)) || null; };
@@ -1462,7 +1597,7 @@
   }
 
   // ---------------------------------------------------------- tabs + rendering
-  const PAGES = {home: ['vHome', 'homeP', pageHome], life: ['vLife', 'lifeP', pageLife], gym: ['vGym', 'gymP', pageGym]};
+  const PAGES = {home: ['vHome', 'homeP', pageHome], life: ['vLife', 'lifeP', pageLife], gym: ['vGym', 'gymP', pageGym], school: ['vSchool', 'schoolP', pageSchool]};
   function render() {
     const ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.closest('.lp')) { pendingRender = true; return; }
@@ -1481,7 +1616,7 @@
     $(t === 'call' ? 'vCall' : PAGES[t][0]).classList.add('on');
     document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
     const title = document.querySelector('.titlebar .title');
-    if (title) title.textContent = t === 'call' ? 'Capri' : t === 'gym' ? 'Gym' : t === 'life' ? 'Life' : 'Capri';
+    if (title) title.textContent = t === 'call' ? 'Capri' : t === 'gym' ? 'Gym' : t === 'life' ? 'Life' : t === 'school' ? 'School' : 'Capri';
     if (t !== 'call') { const el = $(PAGES[t][1]); render(); el.scrollTop = 0; }
   }
   document.querySelectorAll('.tabbar button').forEach(b => b.onclick = () => setTab(b.dataset.t));
@@ -1532,7 +1667,7 @@
         if (!armed[k]) { armed[k] = 1; b.classList.add('arm'); b.textContent = 'DEL?'; setTimeout(() => { delete armed[k]; if (b.isConnected) { b.classList.remove('arm'); b.textContent = '×'; } }, 2500); return; }
         delete armed[k];
         act(b.dataset.k, v);
-        if (S) { const f = x => x.id !== v; S.goals = S.goals.filter(f); S.bills = S.bills.filter(f); S.habits = S.habits.filter(f); S.recent = S.recent.filter(f); }
+        if (S) { const f = x => x.id !== v; S.goals = S.goals.filter(f); S.bills = S.bills.filter(f); S.habits = S.habits.filter(f); S.recent = S.recent.filter(f); if (S.rewards) S.rewards.items = S.rewards.items.filter(f); }
         render(); return;
       }
       case 'achf': achFilter = v; render(); return;
@@ -1589,9 +1724,49 @@
       case 'reps': G.reps = Math.max(1, Math.min(100, G.reps + +v)); saveG(); { const e = $('gReps'); if (e) e.textContent = G.reps; } return;
       case 'logset': logSet(curLift(), G.wt, G.reps); return;
       case 'mic': unlockA(); micStart(); return;
+      case 'qstart': if (!S || !(S.cards || []).length) return; quiz = {list: S.cards.slice(), i: 0, show: false, right: 0, wrong: 0}; if (tab !== 'school') setTab('school'); else render(); $('schoolP').scrollTop = 0; return;
+      case 'qshow': if (quiz) { quiz.show = true; render(); } return;
+      case 'qgrade': {
+        if (!quiz) return;
+        const c = quiz.list[quiz.i], ok = v === '1'; if (!c) return;
+        act('cardgrade', c.d + ' ' + c.i + ' ' + (ok ? 'right' : 'wrong'), true);
+        if (ok) { quiz.right++; if (S) { S.cards = S.cards.filter(x => !(x.d === c.d && x.i === c.i)); S.cardsDue = Math.max(0, (S.cardsDue || 1) - 1); } }
+        else { quiz.wrong++; quiz.list.push(c); }
+        quiz.i++; quiz.show = false; render(); return;
+      }
+      case 'qend': quiz = null; store.set('capri-life', S); render(); return;
+      case 'lec': act('lecture', v); if (S && S.lecture && v === 'stop') { S.lecture.on = false; S.lecture.writing = true; } toast(v === 'stop' ? 'STOPPING...' : 'STARTING NOTES ON THE LAPTOP...', 'c'); render(); return;
+      case 'tdone': case 'tundo': {
+        act(a === 'tdone' ? 'taskdone' : 'taskundo', v);
+        if (S && S.school) {
+          const sc = S.school;
+          if (a === 'tdone') { const t = sc.tasks.find(x => x.id === v); sc.tasks = sc.tasks.filter(x => x.id !== v); if (t) (sc.done = sc.done || []).unshift({id: t.id, title: t.title, course: t.course, doneAt: Date.now()}); toast('CHECKED OFF ✓', 'c'); }
+          else { const t = (sc.done || []).find(x => x.id === v); sc.done = (sc.done || []).filter(x => x.id !== v); if (t) sc.tasks.push({id: t.id, title: t.title, course: t.course, due: 0, kind: 'todo', parent: ''}); }
+        }
+        render(); return;
+      }
+      case 'tbreak': act('breakdown', v); toast('PLANNING THE STEPS...', 'c'); return;
+      case 'tadd': {
+        const t = val('tTitle'); if (!t) { toast('WHAT\'S THE ASSIGNMENT?', 'r'); return; }
+        const d = val('tDue'), c = val('tCourse');
+        act('taskadd', t.replace(/\|/g, '/') + '|' + c + '|' + d + '|homework');
+        if (S && S.school) S.school.tasks.push({id: 'tmp' + Date.now(), title: t, course: c, due: d ? new Date(d).getTime() : 0, kind: 'homework', parent: ''});
+        $('tTitle').value = ''; $('tTitle').blur(); render(); return;
+      }
+      case 'rcards': act('cardsmake', v); toast('MAKING FLASHCARDS...', 'c'); if (S && S.readings) { const r = S.readings.find(x => x.id === v); if (r) r.cards = true; } render(); return;
+      case 'slp': act('sleep', v); if (S && S.sleep) S.sleep.bedAt = v === 'bed' ? Date.now() : 0; toast(v === 'bed' ? 'GOODNIGHT, CHOOM' : v === 'up' ? 'MORNING!' : 'OKAY', 'c'); render(); return;
+      case 'slph': { const h = parseFloat(val('slpH')); if (!(h >= 1 && h <= 16)) { toast('HOW MANY HOURS?', 'r'); return; } act('sleep', 'hours ' + h); const e = $('slpH'); if (e) { e.value = ''; e.blur(); } return; }
+      case 'redeem': {
+        const k = 'rd' + v;
+        if (!armed[k]) { armed[k] = 1; b.textContent = 'SURE?'; setTimeout(() => { delete armed[k]; if (b.isConnected) b.textContent = 'CASH IN'; }, 2500); return; }
+        delete armed[k]; act('redeem', v);
+        if (S && S.rewards) { const r = S.rewards.items.find(x => x.id === v); if (r) { if (r.kind === 'body') S.rewards.body -= r.cost; else S.rewards.cred -= r.cost; r.last = Date.now(); S.rewards.log = [{name: r.name, cost: r.cost, kind: r.kind, at: Date.now()}].concat(S.rewards.log || []); } }
+        render(); return;
+      }
+      case 'rwnew': { const n = val('rwName'), c = parseInt(val('rwCost'), 10); if (!n || !(c > 0)) { toast('NAME + COST', 'r'); return; } act('rewardadd', n.replace(/\|/g, '/') + '|' + c + '|' + v); if (S && S.rewards) S.rewards.items.push({id: 'tmp' + Date.now(), name: n.toUpperCase(), cost: c, kind: v, last: 0}); render(); return; }
     }
   }
-  ['homeP', 'lifeP', 'gymP'].forEach(id => $(id).addEventListener('click', onTap));
+  ['homeP', 'lifeP', 'gymP', 'schoolP'].forEach(id => $(id).addEventListener('click', onTap));
   document.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.closest('.lp')) return;
     const form = e.target.closest('.form'); const btn = form && form.querySelector('[data-a]');
