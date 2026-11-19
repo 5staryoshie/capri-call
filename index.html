@@ -1156,6 +1156,27 @@
     return o;
   }
   const CATS_OUT = ['food', 'transport', 'shopping', 'bills', 'fun', 'school', 'other'], CATS_IN = ['job', 'gift', 'sold', 'other'];
+  // ---------------------------------------------------------- saving coach
+  function saveHtml() {
+    const V = S.save; if (!V) return '';
+    let o = head('SAVING COACH', 'PAY YOURSELF ' + V.pct + '% FIRST');
+    o += `<div class="stats">${stat('NO-SPEND STREAK', V.streak + (V.streak === 1 ? ' DAY' : ' DAYS'), 'y')}${stat('PAID YOU FIRST', V.askMonth ? V.payMonth + ' / ' + V.askMonth : '--', 'c')}${stat('KEPT BY SKIPPING', usd(V.skipMonth), 'y')}</div>`;
+    for (const a of V.asks) o += `<div class="panel cut y" style="margin-top:8px"><b>You got ${usd(a.income)}. Move ${usd(a.amt)} to savings now?</b><div class="dim" style="font-size:11px">Cash App: Money tab › Savings › Add</div><div class="chips" style="margin-top:8px"><button class="chip on" data-a="payf" data-v="${esc(a.id)} moved">MOVED IT</button><button class="chip" data-a="payf" data-v="${esc(a.id)} skip">NOT THIS TIME</button></div></div>`;
+    if (!V.spentToday && !V.noSpendToday) o += `<button class="chip cy" data-a="nospend" style="margin-top:8px">NO SPENDING TODAY · +10 CRED</button>`;
+    o += head('24-HOUR LIST', 'WANT IT? WAIT A DAY');
+    const now = Date.now();
+    for (const w of V.wishes) {
+      const left = 24 - (now - w.at) / 3600e3;
+      const tag = w.state === 'skipped' ? '<span class="a mono pos" style="font-size:11px">KEPT ' + usd(w.price) + '</span>' : w.state === 'want' ? '<span class="a mono yel" style="font-size:11px">PASSED</span>'
+        : left > 0 ? `<span class="a mono dim" style="font-size:11px">${Math.ceil(left)}H LEFT</span>` : `<button class="chip cy" data-a="wdec" data-v="${esc(w.id)} skip" style="padding:4px 8px;font-size:11px">SKIP IT</button><button class="chip" data-a="wdec" data-v="${esc(w.id)} want" style="padding:4px 8px;font-size:11px">STILL WANT</button>`;
+      o += `<div class="row"><div class="t"><b>${esc(w.item)}</b><small>${w.price ? usd(w.price) + ' · ' : ''}${ago(w.at)}</small></div>${tag}</div>`;
+    }
+    o += `<div class="form"><input id="wItem" placeholder="something you want to buy" maxlength="60"><input id="wPrice" type="number" inputmode="decimal" placeholder="$" style="max-width:80px"><button class="btn ghost" data-a="wadd">WAIT</button></div>`;
+    o += `<div class="form"><input id="pPct" type="number" inputmode="numeric" placeholder="pay-yourself-first % (now ${V.pct})"><button class="btn ghost" data-a="ppct">SET</button></div>`;
+    o += `<div class="dim mono" style="font-size:11px;margin-top:8px">${V.cashLast ? 'CASH APP · LAST IMPORT ' + ago(V.cashLast) + ' · ' + V.cashCount + ' ENTRIES' : 'CASH APP · NOT IMPORTED YET'}</div><div class="dim" style="font-size:11px">On cash.app (web): Activity / Statements › export CSV › save to Downloads on the laptop. Capri imports it on her own (read-only).</div>`;
+    if (V.recap) o += `<div class="panel cut c" style="margin-top:8px"><div class="dim mono" style="font-size:10px">LAST WEEK</div><div style="font-size:13px;line-height:1.35">${esc(V.recap)}</div></div>`;
+    return o;
+  }
   function subBudget() {
     const left = S.monthIn - S.monthOut;
     let o = `<div class="stats">${stat('MONTH IN', usd(S.monthIn), 'c')}${stat('MONTH OUT', usd(S.monthOut), 'r')}${stat('LEFT', usd(left), 'y')}</div>`;
@@ -1166,6 +1187,7 @@
       <div class="chips"><button class="chip ${!moneyIn ? 'on' : ''}" data-a="mdir" data-v="out">SPENT</button><button class="chip ${moneyIn ? 'on' : ''}" data-a="mdir" data-v="in">EARNED</button></div>
       <div class="chips" style="margin-top:8px">${cats.map(c => `<button class="chip ${c === moneyCat ? 'on' : ''} ${moneyIn ? 'cy' : ''}" data-a="mcat" data-v="${c}">${c.toUpperCase()}</button>`).join('')}</div>
       <div class="form"><input id="mAmt" class="w2" type="number" inputmode="decimal" placeholder="$0"><input id="mNote" placeholder="note (optional)" maxlength="60"><button class="btn" data-a="mlog">LOG</button></div></div>`;
+    o += saveHtml();
     o += head('MONTHLY LIMIT', S.limit > 0 ? usd(S.monthOut) + ' / ' + usd(S.limit) : 'NOT SET');
     if (S.limit > 0) { const f = S.monthOut / S.limit; o += seg(f, 24, f >= 1 ? 'r tall' : 'tall') + `<div class="dim" style="font-size:12px">${f >= 1 ? 'Over by ' + usd(S.monthOut - S.limit) : usd(S.limit - S.monthOut) + ' to go before the limit'}</div>`; }
     o += `<div class="form"><input id="limAmt" type="number" inputmode="decimal" placeholder="${S.limit > 0 ? 'change limit' : 'set a monthly limit'}"><button class="btn ghost" data-a="limit">SET</button>${S.limit > 0 ? '<button class="btn ghost" data-a="limitoff">OFF</button>' : ''}</div>`;
@@ -1724,6 +1746,11 @@
       case 'reps': G.reps = Math.max(1, Math.min(100, G.reps + +v)); saveG(); { const e = $('gReps'); if (e) e.textContent = G.reps; } return;
       case 'logset': logSet(curLift(), G.wt, G.reps); return;
       case 'mic': unlockA(); micStart(); return;
+      case 'payf': { const [pid, how] = v.split(' '); act('payfirst', v); if (S && S.save) S.save.asks = S.save.asks.filter(x => x.id !== pid); render(); return; }
+      case 'nospend': act('nospend', ''); if (S && S.save) { S.save.noSpendToday = true; S.save.streak++; } render(); return;
+      case 'wdec': { const [wid, how] = v.split(' '); act('wishdecide', v); if (S && S.save) { const w = S.save.wishes.find(x => x.id === wid); if (w) { w.state = how === 'skip' ? 'skipped' : 'want'; if (how === 'skip') S.save.skipMonth += w.price; } } render(); return; }
+      case 'wadd': { const it = val('wItem'), p = parseFloat(val('wPrice')) || 0; if (!it) { toast('WHAT DO YOU WANT?', 'r'); return; } act('wish', it.replace(/\|/g, '/') + (p ? ' | ' + p : '')); if (S && S.save) S.save.wishes.unshift({id: 'tmp' + Date.now(), item: it, price: p, at: Date.now(), state: ''}); $('wItem').value = ''; $('wPrice').value = ''; toast('ON THE 24-HOUR LIST', 'c'); render(); return; }
+      case 'ppct': { const n = parseInt(val('pPct'), 10); if (!(n >= 0 && n <= 80)) { toast('0 TO 80 %', 'r'); return; } act('paypct', String(n)); if (S && S.save) S.save.pct = n; render(); return; }
       case 'qstart': if (!S || !(S.cards || []).length) return; quiz = {list: S.cards.slice(), i: 0, show: false, right: 0, wrong: 0}; if (tab !== 'school') setTab('school'); else render(); $('schoolP').scrollTop = 0; return;
       case 'qshow': if (quiz) { quiz.show = true; render(); } return;
       case 'qgrade': {
