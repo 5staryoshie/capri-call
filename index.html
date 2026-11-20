@@ -1309,12 +1309,15 @@
   }
   function splitCard() {
     const sp = S.split || {};
-    let o = head('SPLIT // ' + (sp.title || 'NO SPLIT'), sp.day ? 'TODAY: ' + sp.day + ' DAY' : '');
-    o += `<div class="chips">${[['ppl', 'PUSH/PULL/LEGS'], ['ul', 'UPPER/LOWER'], ['full', 'FULL BODY'], ['off', 'NONE']].map(x => `<button class="chip ${(sp.id || 'off') === x[0] ? 'on' : ''}" data-a="split" data-v="${x[0]}">${x[1]}</button>`).join('')}${sp.day ? '<button class="chip cy" data-a="split" data-v="next">NEXT DAY »</button>' : ''}</div>`;
+    const mine = sp.id === 'plan', tg = sp.targets || {};
+    let o = head('SPLIT // ' + (sp.title || 'NO SPLIT'), sp.day ? (mine ? 'NEXT: ' + sp.day : 'TODAY: ' + sp.day + ' DAY') : '');
+    o += `<div class="chips">${[['plan', 'MY PLAN'], ['ppl', 'PUSH/PULL/LEGS'], ['ul', 'UPPER/LOWER'], ['full', 'FULL BODY'], ['off', 'NONE']].map(x => `<button class="chip ${(sp.id || 'off') === x[0] ? 'on' : ''}" data-a="split" data-v="${x[0]}">${x[1]}</button>`).join('')}${sp.day ? '<button class="chip cy" data-a="split" data-v="next">NEXT DAY »</button>' : ''}</div>`;
     if (sp.day) {
       o += '<div class="panel cut c" style="margin-top:10px">';
-      for (const n of sp.lifts || []) { const g = (S.suggest || {})[n]; o += `<div class="srow" data-a="liftview" data-v="${esc(n)}"><b>${esc(n)}</b><span>${g ? esc(g.text) : 'no history yet'}</span></div>`; }
-      o += `<button class="bigbtn" data-a="gymstart" style="height:46px;font-size:16px">${ICON.fitness}START ${esc(sp.day)} DAY</button></div>`;
+      if (mine) o += `<div class="dim mono" style="font-size:11px;margin-bottom:6px">${sp.week || 0} / 4 WORKOUTS THIS WEEK · ${sp.gymDay ? 'TRAINING DAY' : 'REST DAY (OR TRAIN ANYWAY)'} · WARM UP 5 MIN FIRST</div>`;
+      for (const n of sp.lifts || []) { const g = (S.suggest || {})[n]; o += `<div class="srow" data-a="liftview" data-v="${esc(n)}"><b>${esc(n)}${tg[n] ? `<small class="dim mono" style="display:block;font-size:11px;font-weight:400">${esc(tg[n].toUpperCase())}</small>` : ''}</b><span>${g ? esc(g.text) : 'no history yet'}</span></div>`; }
+      if (sp.finisher) o += `<div class="dim mono" style="font-size:11px;margin-top:6px">${esc(sp.finisher.toUpperCase())}</div>`;
+      o += `<button class="bigbtn" data-a="gymstart" style="height:46px;font-size:16px">${ICON.fitness}START ${esc(sp.day)}${mine ? '' : ' DAY'}</button></div>`;
     } else o += '<div class="hint2">Pick a split and Capri lines up each day\'s exercises, with what to lift, in gym mode and your game plan.</div>';
     return o;
   }
@@ -1512,6 +1515,7 @@
     const names = first.concat(lifts().map(l => l.name).filter(n => first.indexOf(n) < 0));
     o += head('EXERCISE', L ? esc(L.group) : '') + `<div class="chips">${names.map(n => `<button class="chip ${L && L.name === n ? 'on' : ''}" data-a="ex" data-v="${esc(n)}">${esc(n.toUpperCase())}</button>`).join('')}</div>`;
     if (L) o += `<div class="dim mono" style="font-size:12px;margin-top:6px">BEST · <span class="pos">${liftTxt(L)}</span>${S && S.split && S.split.day ? ' · ' + esc(S.split.day) + ' DAY' : ''}</div>`;
+    { const tgt = L && S && S.split && S.split.targets && S.split.targets[L.name]; if (tgt) o += `<div class="dim mono" style="font-size:12px;margin-top:4px">PLAN · <span class="yel">${esc(tgt.toUpperCase())}</span></div>`; }
     { const sg = L && S && S.suggest && S.suggest[L.name]; if (sg) o += `<div class="sugg" data-a="usesugg" data-v="${esc(L.name)}">SUGGESTED · ${esc(sg.text)} <span class="yel">TAP TO USE</span></div>`; }
     o += `<div class="panel cut y" style="margin-top:12px">`;
     if (!ro) o += `<div class="dim" style="text-align:center;font-size:11px;letter-spacing:2px">WEIGHT</div><div class="stepper"><button data-a="wt" data-v="-45">−45</button><button data-a="wt" data-v="-5">−5</button><div class="val" id="gWt">${num(G.wt)}<small> LB</small></div><button data-a="wt" data-v="5">+5</button><button data-a="wt" data-v="45">+45</button></div>`;
@@ -1734,7 +1738,7 @@
       case 'restset': G.rest = +v; saveG(); render(); return;
       case 'rest30': if (G.restEnd > Date.now()) { G.restEnd += 30000; G.restDur += 30; } else { G.restEnd = Date.now() + 30000; G.restDur = 30; } saveG(); gymTick(); return;
       case 'restskip': G.restEnd = 0; saveG(); gymTick(); return;
-      case 'ex': { G.ex = v; const L = findLift(v); const last = G.sets.slice().reverse().find(x => x.lift === v); const sg = S && S.suggest && S.suggest[v]; if (last) { G.wt = last.wt || G.wt; G.reps = last.reps; } else if (sg) { if (sg.wt) G.wt = sg.wt; if (sg.reps) G.reps = sg.reps; } else if (L) { if (!L.repsOnly && L.best) G.wt = L.best; if (L.reps) G.reps = L.reps; } saveG(); render(); return; }
+      case 'ex': { G.ex = v; { const rs = S && S.split && S.split.rests && S.split.rests[v]; if (rs) G.rest = rs; } const L = findLift(v); const last = G.sets.slice().reverse().find(x => x.lift === v); const sg = S && S.suggest && S.suggest[v]; if (last) { G.wt = last.wt || G.wt; G.reps = last.reps; } else if (sg) { if (sg.wt) G.wt = sg.wt; if (sg.reps) G.reps = sg.reps; } else if (L) { if (!L.repsOnly && L.best) G.wt = L.best; if (L.reps) G.reps = L.reps; } saveG(); render(); return; }
       case 'usesugg': { const sg = S && S.suggest && S.suggest[v]; if (sg) { if (sg.wt) G.wt = sg.wt; if (sg.reps) G.reps = sg.reps; saveG(); render(); } return; }
       case 'liftview': liftView = liftView === v ? '' : v; if (tab !== 'life') { sub = 'fitness'; setTab('life'); } render(); setTimeout(() => { const el = document.querySelector('#lifeP .panel.y [data-a=liftclose]'); if (el) el.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 30); return;
       case 'liftclose': liftView = ''; render(); return;
