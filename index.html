@@ -1055,6 +1055,8 @@
               : `<button class="bigbtn" data-a="gymstart">${ICON.fitness}START GYM MODE</button>`;
     o += planHtml();
     if ((S.cards || []).length) o += `<button class="bigbtn ghost" data-a="qstart">${ICON.ach}REVIEW ${S.cards.length} FLASHCARDS</button>`;
+    o += goalsHtml();
+    o += foodHtml(false);
     o += sleepHtml(false);
     o += focusHtml();
     o += head("TODAY'S HABITS", done + '/' + S.habits.length) + habitGrid(todayKey());
@@ -1143,7 +1145,7 @@
 
   // ---------------------------------------------------------- LIFE
   function pageLife() {
-    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['ach', 'ACHIEVEMENTS'], ['shop', 'SHOP']];
+    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['food', 'FOOD'], ['ach', 'ACHIEVEMENTS'], ['shop', 'SHOP']];
     let o = `<div class="ltitle">LIFE PLANNER</div><div class="lsub">// BODY · MIND · MONEY · ACHIEVEMENTS</div>${syncHtml()}`;
     o += `<div class="chips" style="margin-top:14px">${subs.map(([k, t]) => `<button class="chip ${sub === k ? 'on' : ''}" data-a="sub" data-v="${k}">${t}</button>`).join('')}</div>`;
     if (!S) return o + '<div class="panel cut" style="margin-top:16px"><div class="hint2">Waiting for your laptop to send your planner...</div></div>';
@@ -1152,10 +1154,41 @@
     else if (sub === 'journal') o += subJournal();
     else if (sub === 'fitness') o += subFitness();
     else if (sub === 'shop') o += subShop();
+    else if (sub === 'food') o += foodHtml(true);
     else o += subAch();
     return o;
   }
   const CATS_OUT = ['food', 'transport', 'shopping', 'bills', 'fun', 'school', 'other'], CATS_IN = ['job', 'gift', 'sold', 'other'];
+  // ---------------------------------------------------------- food & weekly goals
+  function foodHtml(full) {
+    const F = S.food; if (!F) return '';
+    const p = Math.round(F.p || 0), c = Math.round(F.c || 0), done = p >= F.goalP;
+    let o = head('FOOD & PROTEIN', p + ' / ' + F.goalP + ' G');
+    o += seg(p / Math.max(1, F.goalP), 20, done ? 'tall c' : 'tall') + `<div class="dim mono" style="font-size:11px;margin-top:4px">${done ? 'PROTEIN GOAL HIT ✓' : Math.max(0, F.goalP - p) + ' G PROTEIN TO GO'} · ${c.toLocaleString('en-US')} / ${F.goalC.toLocaleString('en-US')} CAL</div>`;
+    o += `<div class="form"><input id="fText${full ? 'L' : 'H'}" placeholder="what did you eat? e.g. 2 eggs and toast" maxlength="120"><button class="btn" data-a="flog" data-v="fText${full ? 'L' : 'H'}">LOG</button></div>`;
+    if ((F.favs || []).length) o += `<div class="chips" style="margin-top:6px;flex-wrap:wrap">${F.favs.slice(0, full ? 12 : 5).map(x => `<button class="chip" data-a="fagain" data-v="${esc(x.text)}">+ ${esc(x.text.toUpperCase())} <span class="dim">${Math.round(x.p)}G</span></button>`).join('')}</div>`;
+    if (full) {
+      o += head('TODAY');
+      if (!(F.meals || []).length) o += '<div class="hint2">Nothing logged today. Type it above, or just tell Capri what you ate.</div>';
+      for (const m of F.meals || []) o += `<div class="row"><div class="t"><b>${esc(m.text)}</b><small>${hm(m.at).toUpperCase()} · ${Math.round(m.c)} CAL</small></div><span class="a mono pos">${Math.round(m.p)} G</span><button class="x" data-a="fdel" data-v="${esc(m.id)}">×</button></div>`;
+      o += head('PROTEIN · LAST 7 DAYS') + '<div class="panel cut"><div class="sbars" style="grid-template-columns:repeat(7,1fr)">';
+      for (const [d, pp, cc, has] of F.week || []) { const dt = new Date(d + 'T12:00'); o += `<div><i style="height:${Math.min(100, pp / Math.max(1, F.goalP) * 80)}%;background:${pp >= F.goalP ? 'var(--cyan)' : has ? 'var(--yel)' : ''}"></i><span>${'SMTWTFS'[dt.getDay()]}</span></div>`; }
+      o += '<em></em></div><div class="dim mono" style="font-size:10px;margin-top:4px">LINE = YOUR PROTEIN GOAL</div></div>';
+      if (F.bulk) o += `<div class="panel cut c" style="margin-top:8px;font-size:13px">${esc(F.bulk)}</div>`;
+      o += head('DAILY TARGETS') + `<div class="form"><input id="fgP" type="number" inputmode="numeric" placeholder="protein g (${F.goalP})"><input id="fgC" type="number" inputmode="numeric" placeholder="calories (${F.goalC})"><button class="btn ghost" data-a="fgoal">SET</button></div><div class="dim" style="font-size:11px;margin-top:4px">Estimates, not exact. Your plan: 120-150 g protein, eat at or a bit above maintenance.</div>`;
+    }
+    return o;
+  }
+  function goalsHtml() {
+    const R = S.review; if (!R) return '';
+    const g = R.goals || [];
+    let o = head("THIS WEEK'S GOALS", g.length ? g.filter(x => x.done).length + ' / ' + g.length + ' DONE' : '');
+    if (!g.length) {
+      o += `<div class="panel cut y"><div class="dim" style="font-size:12px">Pick up to 3 things to nail this week.</div>${[1, 2, 3].map(i => `<div class="form"><input id="wg${i}" placeholder="goal ${i}" maxlength="80"></div>`).join('')}<div class="form" style="justify-content:flex-end"><button class="btn" data-a="wgsave">SET GOALS</button></div></div>`;
+    } else for (const x of g) o += `<div class="row"><button class="tbx ${x.done ? 'on' : ''}" data-a="wgtick" data-v="${x.n}">${ICON.check}</button><div class="t"><b style="${x.done ? 'text-decoration:line-through;opacity:.7' : ''}">${esc(x.text)}</b></div></div>`;
+    if (R.text) o += `<div class="panel cut c" style="margin-top:8px"><div class="dim mono" style="font-size:10px">WEEK IN REVIEW · ${ago(R.at)}</div><div style="font-size:13px;line-height:1.4">${esc(R.text)}</div></div>`;
+    return o;
+  }
   // ---------------------------------------------------------- saving coach
   function saveHtml() {
     const V = S.save; if (!V) return '';
@@ -1750,6 +1783,16 @@
       case 'reps': G.reps = Math.max(1, Math.min(100, G.reps + +v)); saveG(); { const e = $('gReps'); if (e) e.textContent = G.reps; } return;
       case 'logset': logSet(curLift(), G.wt, G.reps); return;
       case 'mic': unlockA(); micStart(); return;
+      case 'flog': case 'fagain': {
+        const t = a === 'flog' ? val(v) : v; if (!t) { toast('WHAT DID YOU EAT?', 'r'); return; }
+        act('food', t.replace(/\|/g, '/'));
+        if (a === 'fagain' && S && S.food) { const fv = (S.food.favs || []).find(x => x.text === v); if (fv) { S.food.p += fv.p; S.food.c += fv.c; (S.food.meals = S.food.meals || []).push({id: 'tmp' + Date.now(), text: fv.text, p: fv.p, c: fv.c, at: Date.now()}); } }
+        const e = a === 'flog' && $(v); if (e) { e.value = ''; e.blur(); } toast(a === 'flog' ? 'ADDING IT UP...' : 'LOGGED', 'c'); render(); return;
+      }
+      case 'fdel': act('fooddel', v); if (S && S.food) { const m = (S.food.meals || []).find(x => x.id === v); if (m) { S.food.p -= m.p; S.food.c -= m.c; } S.food.meals = (S.food.meals || []).filter(x => x.id !== v); } render(); return;
+      case 'fgoal': { const p = parseInt(val('fgP'), 10), c = parseInt(val('fgC'), 10); if (!(p > 0) && !(c > 0)) return; act('foodgoal', (p > 0 ? 'protein ' + p + ' ' : '') + (c > 0 ? 'cal ' + c : '')); if (S && S.food) { if (p > 0) S.food.goalP = p; if (c > 0) S.food.goalC = c; } render(); return; }
+      case 'wgsave': { const gs = [1, 2, 3].map(i => val('wg' + i)).filter(Boolean); if (!gs.length) { toast('WRITE AT LEAST ONE GOAL', 'r'); return; } act('weekgoals', gs.map(x => x.replace(/\|/g, '/')).join(' | ')); if (S && S.review) S.review.goals = gs.map((t, i) => ({n: i + 1, text: t, done: false})); render(); return; }
+      case 'wgtick': { const g = S && S.review && S.review.goals.find(x => String(x.n) === v); if (!g) return; act('weekgoal', (g.done ? 'undo ' : 'done ') + v); g.done = !g.done; if (g.done) toast('GOAL DONE ✓', 'c'); render(); return; }
       case 'payf': { const [pid, how] = v.split(' '); act('payfirst', v); if (S && S.save) S.save.asks = S.save.asks.filter(x => x.id !== pid); render(); return; }
       case 'nospend': act('nospend', ''); if (S && S.save) { S.save.noSpendToday = true; S.save.streak++; } render(); return;
       case 'wdec': { const [wid, how] = v.split(' '); act('wishdecide', v); if (S && S.save) { const w = S.save.wishes.find(x => x.id === wid); if (w) { w.state = how === 'skip' ? 'skipped' : 'want'; if (how === 'skip') S.save.skipMonth += w.price; } } render(); return; }
