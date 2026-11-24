@@ -1230,11 +1230,12 @@
     const M = S && S.market; if (!M) return '';
     const al = M.alerts || [];
     if (!full) {
-      if (!M.on || !al.length || !M.lastAt || Date.now() - M.lastAt > 20 * 3600000) return '';
+      const t = Math.max(M.lastAt || 0, M.briefAt || 0); if (!M.on || !al.length || !t || Date.now() - t > 14 * 3600000) return '';
       return head('MARKETS', al[0][0].toUpperCase()) + `<button class="panel cut c" data-a="go" data-v="markets" style="font:inherit;color:inherit;text-align:left;width:100%;font-size:13px;line-height:1.4">${esc(al[0][1])}</button>`;
     }
-    let o = `<div class="panel cut" style="margin-top:14px;font-size:13px;line-height:1.4"><b>Only what matters.</b> After the close on weekdays Capri checks Reuters, AP, CNBC and others, and tells you only on big days: indexes moving 1.5%+, a watchlist stock moving 5%+, earnings, or Fed / inflation / jobs news. Facts only, not financial advice.</div>`;
+    let o = `<div class="panel cut" style="margin-top:14px;font-size:13px;line-height:1.4"><b>Only what matters.</b> Around 9 AM on trading days you get a quick briefing before the open: overnight news, news on your stocks, and what's scheduled. After the close Capri checks Reuters, AP, CNBC and others, and tells you only on big days: indexes moving 1.5%+, a watchlist stock moving 5%+, earnings, or Fed / inflation / jobs news. Facts only, not financial advice.</div>`;
     o += `<div class="form"><button class="chip ${M.on ? 'on' : ''}" data-a="mktoggle">${M.on ? 'UPDATES ON' : 'UPDATES OFF'}</button></div>`;
+    if (M.brief && M.briefAt && new Date(M.briefAt).toDateString() === new Date().toDateString()) o += head('BEFORE THE OPEN', ago(M.briefAt)) + `<div class="panel cut y" style="font-size:14px;line-height:1.45">${esc(M.brief)}</div>`;
     if (M.last) o += head('LAST CLOSE', M.lastAt ? ago(M.lastAt) : '') + `<div class="panel cut c" style="font-size:14px;line-height:1.45">${esc(M.last)}</div>`;
     if ((M.stories || []).length) o += head('TOP STORIES') + M.stories.map(s => `<div class="row"><div class="t"><b style="font-weight:500;white-space:normal">${esc(s)}</b></div></div>`).join('');
     o += head('UPDATES', al.length ? '' : 'NONE YET');
