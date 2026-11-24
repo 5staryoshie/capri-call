@@ -1072,6 +1072,7 @@
     o += planHtml();
     if ((S.cards || []).length) o += `<button class="bigbtn ghost" data-a="qstart">${ICON.ach}REVIEW ${S.cards.length} FLASHCARDS</button>`;
     o += resetHtml(false);
+    o += marketHtml(false);
     o += goalsHtml();
     o += foodHtml(false);
     o += sleepHtml(false);
@@ -1162,7 +1163,7 @@
 
   // ---------------------------------------------------------- LIFE
   function pageLife() {
-    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['food', 'FOOD'], ['reset', 'RESET'], ['ach', 'ACHIEVEMENTS'], ['shop', 'SHOP']];
+    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['food', 'FOOD'], ['reset', 'RESET'], ['markets', 'MARKETS'], ['ach', 'ACHIEVEMENTS'], ['shop', 'SHOP']];
     let o = `<div class="ltitle">LIFE PLANNER</div><div class="lsub">// BODY · MIND · MONEY · ACHIEVEMENTS</div>${syncHtml()}`;
     o += `<div class="chips" style="margin-top:14px">${subs.map(([k, t]) => `<button class="chip ${sub === k ? 'on' : ''}" data-a="sub" data-v="${k}">${t}</button>`).join('')}</div>`;
     if (!S) return o + '<div class="panel cut" style="margin-top:16px"><div class="hint2">Waiting for your laptop to send your planner...</div></div>';
@@ -1173,6 +1174,7 @@
     else if (sub === 'shop') o += subShop();
     else if (sub === 'food') o += foodHtml(true);
     else if (sub === 'reset') o += resetHtml(true);
+    else if (sub === 'markets') o += marketHtml(true);
     else o += subAch();
     return o;
   }
@@ -1223,6 +1225,25 @@
     return o;
   }
   setInterval(() => { const e = $('uLeft'); if (!e) return; const left = Math.max(0, urgeEnd - Date.now()); e.textContent = mmss(left / 1000); const t = $('uTip'); if (t) t.textContent = left > 0 ? BREATH[Math.floor((URGE_MS - left) / 20000) % BREATH.length] : 'Made it. How did it go?'; }, 1000);
+  // ---------------------------------------------------------- MARKETS (facts only, not advice)
+  function marketHtml(full) {
+    const M = S && S.market; if (!M) return '';
+    const al = M.alerts || [];
+    if (!full) {
+      if (!M.on || !al.length || !M.lastAt || Date.now() - M.lastAt > 20 * 3600000) return '';
+      return head('MARKETS', al[0][0].toUpperCase()) + `<button class="panel cut c" data-a="go" data-v="markets" style="font:inherit;color:inherit;text-align:left;width:100%;font-size:13px;line-height:1.4">${esc(al[0][1])}</button>`;
+    }
+    let o = `<div class="panel cut" style="margin-top:14px;font-size:13px;line-height:1.4"><b>Only what matters.</b> After the close on weekdays Capri checks Reuters, AP, CNBC and others, and tells you only on big days: indexes moving 1.5%+, a watchlist stock moving 5%+, earnings, or Fed / inflation / jobs news. Facts only, not financial advice.</div>`;
+    o += `<div class="form"><button class="chip ${M.on ? 'on' : ''}" data-a="mktoggle">${M.on ? 'UPDATES ON' : 'UPDATES OFF'}</button></div>`;
+    if (M.last) o += head('LAST CLOSE', M.lastAt ? ago(M.lastAt) : '') + `<div class="panel cut c" style="font-size:14px;line-height:1.45">${esc(M.last)}</div>`;
+    if ((M.stories || []).length) o += head('TOP STORIES') + M.stories.map(s => `<div class="row"><div class="t"><b style="font-weight:500;white-space:normal">${esc(s)}</b></div></div>`).join('');
+    o += head('UPDATES', al.length ? '' : 'NONE YET');
+    o += al.length ? al.map(([d, t]) => `<div class="row"><div class="t"><b style="font-weight:500;white-space:normal;line-height:1.4">${esc(t)}</b><small>${esc(d.toUpperCase())}</small></div></div>`).join('') : '<div class="hint2">Quiet so far. You only hear from Capri when something big happens.</div>';
+    o += head('WATCHLIST', (M.watch || []).length + ' TICKERS') + `<div class="chips" style="flex-wrap:wrap">${(M.watch || []).map(t => `<button class="chip" data-a="mkdel" data-v="${esc(t)}">${esc(t)} ×</button>`).join('')}</div>` +
+      `<div class="form"><input id="mkNew" placeholder="add a ticker, e.g. AMD" maxlength="6" autocapitalize="characters"><button class="btn ghost" data-a="mkadd">ADD</button></div>` +
+      `<div class="dim" style="font-size:11px;margin-top:6px;line-height:1.4">Starts with the stocks that move the whole market (SPY = S&P 500, QQQ = Nasdaq 100, plus the biggest companies). Stocks you trade in Cash App get added from your Cash App import. These aren't picks. Capri isn't a financial advisor.</div>`;
+    return o;
+  }
   // ---------------------------------------------------------- food & weekly goals
   function foodHtml(full) {
     const F = S.food; if (!F) return '';
@@ -1877,6 +1898,9 @@
       case 'slipx': slipOpen = false; render(); return;
       case 'slipsave': act('resetslip', [slipF.feel, slipF.where, slipF.trig].join('|')); slipOpen = false; if (S && S.reset) { S.reset.best = Math.max(S.reset.best, S.reset.days); S.reset.days = 0; S.reset.slips30++; } render(); return;
       case 'swapadd': { const t = val('swapNew'); if (!t) return; act('resetswap', t, true); if (S && S.reset) (S.reset.swaps = S.reset.swaps || []).push(t); $('swapNew').value = ''; render(); return; }
+      case 'mkadd': { const t = (val('mkNew') || '').toUpperCase().replace(/[^A-Z.\-]/g, ''); if (!t) return; act('stockwatch', 'add ' + t, true); if (S && S.market && S.market.watch.indexOf(t) < 0) S.market.watch.push(t); $('mkNew').value = ''; render(); return; }
+      case 'mkdel': act('stockwatch', 'remove ' + v, true); if (S && S.market) S.market.watch = S.market.watch.filter(x => x !== v); render(); return;
+      case 'mktoggle': if (!S || !S.market) return; S.market.on = !S.market.on; act('stocks', S.market.on ? 'on' : 'off', true); render(); return;
       case 'swapdel': act('resetswap', '-' + v, true); if (S && S.reset) S.reset.swaps = (S.reset.swaps || []).filter(x => x !== v); render(); return;
       case 'flog': case 'fagain': {
         const t = a === 'flog' ? val(v) : v; if (!t) { toast('WHAT DID YOU EAT?', 'r'); return; }
