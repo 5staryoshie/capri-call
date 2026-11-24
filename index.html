@@ -361,7 +361,15 @@
   .wrow .wt em{display:block;font-style:normal;font-family:"Share Tech Mono",monospace;font-size:11px;color:var(--cyan-ink);margin-top:2px}
   .tbx{flex:none;width:26px;height:26px;border:1.5px solid var(--cyan);background:none;color:transparent;display:grid;place-items:center;padding:0}
   .tbx svg{width:16px;height:16px} .tbx.on{background:var(--cyan);color:var(--dark)}
-  .sel{background:#1c0a0e;border:1px solid rgba(236,46,58,.6);color:var(--ink);font:inherit;font-size:13px;padding:0 6px;max-width:42%}
+  .selbox{background:#1c0a0e;border:1px solid rgba(236,46,58,.6);color:var(--ink);font:inherit;font-size:13px;padding:0 6px;max-width:42%}
+  .lgroups{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:14px}
+  .lgroups .chip{padding:8px 0;text-align:center;font-size:12.5px;letter-spacing:.5px}
+  .lpages{display:flex;margin-top:8px;border:1px solid rgba(236,46,58,.45);background:rgba(20,6,10,.6)}
+  .lpages button{flex:1;background:none;border:0;border-right:1px solid rgba(236,46,58,.25);color:var(--dim);font:inherit;font-family:"Share Tech Mono",monospace;font-size:12px;letter-spacing:1px;padding:9px 4px}
+  .lpages button:last-child{border-right:0}
+  .lpages button.on{background:rgba(236,46,58,.22);color:var(--yel);box-shadow:inset 0 -2px 0 var(--yel)}
+  .moretog{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;margin-top:18px;background:none;border:1px dashed rgba(236,46,58,.55);color:var(--ink);font:inherit;font-family:"Share Tech Mono",monospace;font-size:13px;letter-spacing:2px;padding:10px}
+  .moretog b{color:var(--dim);font-weight:400;font-size:10.5px;letter-spacing:1px}
   .qq{font-size:19px;line-height:1.35;margin:12px 0 14px;white-space:pre-wrap;font-weight:600}
   .qa{font-size:16px;line-height:1.4;color:var(--cyan-ink);border-top:1px dashed rgba(94,226,236,.55);padding-top:10px;white-space:pre-wrap}
   .rec{color:var(--lred);font-family:"Chakra Petch",sans-serif;letter-spacing:1px;animation:recb 1.4s infinite}
@@ -945,6 +953,7 @@
   let lastSync = store.get('capri-life-at', 0);   // when we last heard from her
   let tab = store.get('capri-tab', 'home'), sub = store.get('capri-lsub', 'budget');
   let achFilter = 'ALL', moneyIn = false, moneyCat = 'food', selGroup = '';
+  let homeMore = store.get('capri-hmore', false);
   let offline = false, myRids = {}, pendingRender = false;
   let G = store.get('capri-gym', null);           // the gym session on the phone
   if (G && G.on && Date.now() - G.start > 5 * 3600e3) G = null;   // a session left open overnight
@@ -1060,29 +1069,44 @@
     }
     const done = S.habits.filter(x => habitDone(x)).length, left = S.monthIn - S.monthOut;
     const got = S.ladders.reduce((a, L) => a + L.reached, 0);
+    const hr = new Date().getHours(), wd = new Date().getDay();
+    const gymDay = !!(S.split && S.split.gymDay), wkName = S.split && S.split.day ? ' · ' + esc(String(S.split.day).toUpperCase()) : '';
     o += `<div class="strip"><div><b>LV ${S.level}</b><span>BODY</span></div><div><b class="c">${S.cred || 1}</b><span>STREET CRED</span></div><div><b>${usd(left)}</b><span>LEFT THIS MONTH</span></div></div>`;
-    o += rankBars();
-    o += `<div class="cards">
+    // ---- right now: what you'd actually reach for at this time of day
+    if (G.on) o += `<button class="bigbtn" data-a="tab" data-v="gym">${ICON.fitness}BACK TO GYM · ${Math.round((Date.now() - G.start) / 60000)} MIN</button>`;
+    else if (gymDay) o += `<button class="bigbtn" data-a="gymstart">${ICON.fitness}START GYM MODE${wkName}</button>`;
+    o += planHtml();
+    if (S.focusOn) o += focusHtml();
+    if ((S.cards || []).length) o += `<button class="bigbtn ghost" data-a="qstart">${ICON.ach}REVIEW ${S.cards.length} FLASHCARDS</button>`;
+    o += resetHtml(false);
+    o += marketHtml(false);
+    o += diskHtml();
+    if (!jEntry(todayKey()) && hr >= 17) o += head('NIGHT LOG', '+15 CRED') + journalEditor(todayKey());
+    const sleepNow = hr < 12 || hr >= 21;
+    if (sleepNow) o += sleepHtml(false);
+    o += head("TODAY'S HABITS", done + '/' + S.habits.length) + habitGrid(todayKey());
+    o += foodHtml(false);
+    const goalsNow = !!(S.review && (S.review.goals || []).length) || wd === 0 || wd === 1;
+    if (goalsNow) o += goalsHtml();
+    // ---- everything else folds away
+    const extra = ['LEVELS', 'SHORTCUTS'].concat(G.on || gymDay ? [] : ['GYM']).concat(goalsNow ? [] : ['GOALS']).concat(sleepNow ? [] : ['SLEEP']).concat(S.focusOn ? [] : ['FOCUS']).concat(['UNLOCKS']);
+    o += `<button class="moretog" data-a="hmore">${homeMore ? '<span>SHOW LESS ▴</span>' : '<span>MORE ▾</span><b>' + extra.join(' · ') + '</b>'}</button>`;
+    if (homeMore) {
+      o += rankBars();
+      o += `<div class="cards">
       <button class="card cut sel" data-a="go" data-v="budget" style="font:inherit;color:inherit"><div class="hb">BUDGET</div>${ICON.budget}<div class="v">${usd(left)}</div><div class="s">${S.limit > 0 ? Math.round(S.monthOut / S.limit * 100) + '% OF LIMIT' : 'LEFT THIS MONTH'}</div></button>
       <button class="card cut" data-a="go" data-v="habits" style="font:inherit;color:inherit"><div class="hb">HABITS</div>${ICON.habits}<div class="v">${done}/${S.habits.length}</div><div class="s">DONE TODAY</div></button>
       <button class="card cut" data-a="go" data-v="fitness" style="font:inherit;color:inherit"><div class="hb">FITNESS</div>${ICON.fitness}<div class="v">${S.sessionsWeek}</div><div class="s">SESSIONS THIS WEEK</div></button>
       <button class="card cut" data-a="go" data-v="ach" style="font:inherit;color:inherit"><div class="hb">ACHIEVEMENTS</div>${ICON.ach}<div class="v">${got}</div><div class="s">UNLOCKED</div></button></div>`;
-    o += G.on ? `<button class="bigbtn" data-a="tab" data-v="gym">${ICON.fitness}BACK TO GYM · ${Math.round((Date.now() - G.start) / 60000)} MIN</button>`
-              : `<button class="bigbtn" data-a="gymstart">${ICON.fitness}START GYM MODE</button>`;
-    o += planHtml();
-    if ((S.cards || []).length) o += `<button class="bigbtn ghost" data-a="qstart">${ICON.ach}REVIEW ${S.cards.length} FLASHCARDS</button>`;
-    o += resetHtml(false);
-    o += marketHtml(false);
-    o += goalsHtml();
-    o += foodHtml(false);
-    o += sleepHtml(false);
-    o += focusHtml();
-    o += head("TODAY'S HABITS", done + '/' + S.habits.length) + habitGrid(todayKey());
-    if (!jEntry(todayKey()) && new Date().getHours() >= 17) o += head('NIGHT LOG', '+15 CRED') + journalEditor(todayKey());
-    const nx = nextUnlocks(3);
-    if (nx.length) {
-      o += head('NEXT UNLOCKS');
-      for (const {L, f} of nx) o += `<div class="panel cut" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-family:'Chakra Petch',sans-serif;font-size:14px">${esc(L.names[L.reached])}</b><span class="mono yel" style="font-size:12px">${fmtUnit(L.value, L.unit)} / ${fmtUnit(L.steps[L.reached], L.unit)}</span></div><div class="dim" style="font-size:11px">${esc(L.title)}</div>${seg(f, 20)}</div>`;
+      if (!G.on && !gymDay) o += `<button class="bigbtn ghost" data-a="gymstart">${ICON.fitness}START GYM MODE</button>`;
+      if (!goalsNow) o += goalsHtml();
+      if (!sleepNow) o += sleepHtml(false);
+      if (!S.focusOn) o += focusHtml();
+      const nx = nextUnlocks(3);
+      if (nx.length) {
+        o += head('NEXT UNLOCKS');
+        for (const {L, f} of nx) o += `<div class="panel cut" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-family:'Chakra Petch',sans-serif;font-size:14px">${esc(L.names[L.reached])}</b><span class="mono yel" style="font-size:12px">${fmtUnit(L.value, L.unit)} / ${fmtUnit(L.steps[L.reached], L.unit)}</span></div><div class="dim" style="font-size:11px">${esc(L.title)}</div>${seg(f, 20)}</div>`;
+      }
     }
     o += `<button class="bigbtn ghost" data-a="callnow">${ICON.phone}CALL CAPRI</button>`;
     return o;
@@ -1162,10 +1186,25 @@
   }
 
   // ---------------------------------------------------------- LIFE
+  // LIFE: 5 sections, each with its own pages (the old 9 tabs ran off the screen)
+  const LGROUPS = [
+    ['money', 'MONEY', [['budget', 'BUDGET'], ['markets', 'MARKETS']]],
+    ['body', 'BODY', [['fitness', 'FITNESS'], ['food', 'FOOD'], ['sleep', 'SLEEP']]],
+    ['habits', 'HABITS', [['habits', 'HABITS'], ['journal', 'NIGHT LOG']]],
+    ['reset', 'RESET', [['reset', 'RESET']]],
+    ['wins', 'WINS', [['ach', 'ACHIEVEMENTS'], ['shop', 'REWARDS']]]];
+  const lgroupOf = k => LGROUPS.find(x => x[2].some(p => p[0] === k)) || LGROUPS[0];
+  const lastLeaf = store.get('capri-lleaf', {}) || {};
+  function setSub(v) {
+    sub = v; store.set('capri-lsub', v);
+    lastLeaf[lgroupOf(v)[0]] = v; store.set('capri-lleaf', lastLeaf);
+  }
   function pageLife() {
-    const subs = [['budget', 'BUDGET'], ['habits', 'HABITS'], ['journal', 'JOURNAL'], ['fitness', 'FITNESS'], ['food', 'FOOD'], ['reset', 'RESET'], ['markets', 'MARKETS'], ['ach', 'ACHIEVEMENTS'], ['shop', 'SHOP']];
+    if (!LGROUPS.some(x => x[2].some(p => p[0] === sub))) sub = 'budget';
+    const grp = lgroupOf(sub);
     let o = `<div class="ltitle">LIFE PLANNER</div><div class="lsub">// BODY · MIND · MONEY · ACHIEVEMENTS</div>${syncHtml()}`;
-    o += `<div class="chips" style="margin-top:14px">${subs.map(([k, t]) => `<button class="chip ${sub === k ? 'on' : ''}" data-a="sub" data-v="${k}">${t}</button>`).join('')}</div>`;
+    o += `<div class="lgroups">${LGROUPS.map(x => { const lf = lastLeaf[x[0]] && x[2].some(p => p[0] === lastLeaf[x[0]]) ? lastLeaf[x[0]] : x[2][0][0]; return `<button class="chip ${x === grp ? 'on' : ''}" data-a="sub" data-v="${lf}">${x[1]}</button>`; }).join('')}</div>`;
+    if (grp[2].length > 1) o += `<div class="lpages">${grp[2].map(([k, t]) => `<button class="${sub === k ? 'on' : ''}" data-a="sub" data-v="${k}">${t}</button>`).join('')}</div>`;
     if (!S) return o + '<div class="panel cut" style="margin-top:16px"><div class="hint2">Waiting for your laptop to send your planner...</div></div>';
     if (sub === 'budget') o += subBudget();
     else if (sub === 'habits') o += subHabits();
@@ -1175,6 +1214,7 @@
     else if (sub === 'food') o += foodHtml(true);
     else if (sub === 'reset') o += resetHtml(true);
     else if (sub === 'markets') o += marketHtml(true);
+    else if (sub === 'sleep') o += sleepHtml(true) || '<div class="hint2" style="margin-top:12px">Sleep shows up once your laptop syncs.</div>';
     else o += subAch();
     return o;
   }
@@ -1225,6 +1265,15 @@
     return o;
   }
   setInterval(() => { const e = $('uLeft'); if (!e) return; const left = Math.max(0, urgeEnd - Date.now()); e.textContent = mmss(left / 1000); const t = $('uTip'); if (t) t.textContent = left > 0 ? BREATH[Math.floor((URGE_MS - left) / 20000) % BREATH.length] : 'Made it. How did it go?'; }, 1000);
+  // ---------------------------------------------------------- laptop storage (only shows up when it's low)
+  function diskHtml() {
+    const D = S && S.disk; if (!D || !D.low) return '';
+    let o = head('LAPTOP STORAGE', esc(D.name || 'C:') + ' NEARLY FULL');
+    o += `<div class="panel cut y" style="font-size:13px;line-height:1.45"><b>${num(D.free)} GB left of ${num(D.total)} GB.</b> Windows updates can fail like this.${D.roomy ? ' Your ' + esc(D.roomy) + ' drive has plenty of room for big stuff like videos and old downloads.' : ''}` +
+      (D.scan ? `<div style="margin-top:8px">${esc(D.scan)}</div>` : '') +
+      `<div class="form" style="margin-top:8px"><button class="btn ghost" data-a="dscan" ${D.scanning ? 'disabled' : ''}>${D.scanning ? 'CHECKING...' : "WHAT'S USING IT?"}</button></div></div>`;
+    return o;
+  }
   // ---------------------------------------------------------- MARKETS (facts only, not advice)
   function marketHtml(full) {
     const M = S && S.market; if (!M) return '';
@@ -1350,7 +1399,6 @@
       o += head('STREAKS');
       for (const h of S.habits) o += `<div class="row"><div class="t"><b>${esc(h.name)}</b><small>BEST ${h.best} DAYS</small></div><span class="a yel">${h.streak} 🔥</span><button class="x" data-a="del" data-k="habitdel" data-v="${esc(h.id)}">×</button></div>`;
     }
-    o += sleepHtml(true);
     o += head('ADD A HABIT') + `<div class="form"><input id="hName" placeholder="e.g. Drink water" maxlength="40"><button class="btn" data-a="habnew">ADD</button></div>`;
     const have = S.habits.map(h => h.name.toLowerCase());
     const pre = PRESETS.filter(p => have.indexOf(p.toLowerCase()) < 0);
@@ -1552,7 +1600,7 @@
     if (week.length) { o += head('THIS WEEK', week.length + ''); for (const t of week) o += taskRow(t); }
     if (later.length) { o += head('LATER', later.length + ''); for (const t of later.slice(0, 12)) o += taskRow(t); }
     const names = (sc.courses || []).map(c => c.name);
-    o += head('ADD HOMEWORK') + `<div class="form"><input id="tTitle" placeholder="e.g. Essay draft" maxlength="120"></div><div class="form"><input id="tDue" type="datetime-local"><select id="tCourse" class="sel"><option value="">CLASS</option>${names.map(n => `<option>${esc(n)}</option>`).join('')}</select><button class="btn" data-a="tadd">ADD</button></div>`;
+    o += head('ADD HOMEWORK') + `<div class="form"><input id="tTitle" placeholder="e.g. Essay draft" maxlength="120"></div><div class="form"><input id="tDue" type="datetime-local"><select id="tCourse" class="selbox"><option value="">CLASS</option>${names.map(n => `<option>${esc(n)}</option>`).join('')}</select><button class="btn" data-a="tadd">ADD</button></div>`;
     if ((sc.done || []).length) { o += head('JUST FINISHED'); for (const t of sc.done) o += `<div class="row"><button class="tbx on" data-a="tundo" data-v="${esc(t.id)}">${ICON.check}</button><div class="t"><b style="text-decoration:line-through;opacity:.7">${esc(t.title)}</b><small>${t.course ? esc(t.course.toUpperCase()) + ' · ' : ''}${ago(t.doneAt)}</small></div></div>`; }
     const cs = (sc.courses || []).filter(c => c.pct >= 0);
     o += head('GRADES', sc.gpa >= 0 ? 'GPA ' + sc.gpa.toFixed(2) : '');
@@ -1792,9 +1840,11 @@
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a, v = b.dataset.v;
     switch (a) {
-      case 'go': sub = v; store.set('capri-lsub', v); setTab('life'); return;
+      case 'go': setSub(v); setTab('life'); $('lifeP').scrollTop = 0; return;
       case 'tab': setTab(v); return;
-      case 'sub': sub = v; store.set('capri-lsub', v); selGroup = ''; render(); $('lifeP').scrollTop = 0; return;
+      case 'hmore': homeMore = !homeMore; store.set('capri-hmore', homeMore); render(); return;
+      case 'dscan': act('diskscan', '', true); if (S && S.disk) S.disk.scanning = true; toast('CHECKING YOUR LAPTOP...', 'c'); render(); return;
+      case 'sub': setSub(v); selGroup = ''; render(); $('lifeP').scrollTop = 0; return;
       case 'callnow': setTab('call'); setTimeout(() => { const cb = $('callBtn'); if (cb && $('callLbl').textContent.trim() === 'CALL') cb.click(); }, 50); return;
       case 'hab': {
         if (!S) return;
@@ -1843,7 +1893,7 @@
       case 'fstart': act('focus', v); if (S) { S.focusOn = true; S.focusUntil = +v ? Date.now() + v * 60000 : 0; } render(); return;
       case 'fstop': act('focusstop', ''); if (S) S.focusOn = false; render(); return;
       case 'jmood': { const d = b.dataset.d, ta = $('jt_' + d); if (ta) jDraft[d] = ta.value; jMood[d] = jMood[d] === v ? '' : v; render(); return; }
-      case 'jedit': { if (tab !== 'life') { sub = 'journal'; setTab('life'); } jEdit = v === todayKey() ? '' : v; render(); $('lifeP').scrollTop = 0; return; }
+      case 'jedit': { if (tab !== 'life') { setSub('journal'); setTab('life'); } jEdit = v === todayKey() ? '' : v; render(); $('lifeP').scrollTop = 0; return; }
       case 'jsave': case 'jdel': {
         const ta = $('jt_' + v), text = a === 'jdel' ? '' : (ta ? ta.value.trim() : ''), mood = a === 'jdel' ? '' : (jMood[v] || '');
         if (a === 'jsave' && !text && !mood) { toast('WRITE A LINE OR PICK A MOOD', 'r'); return; }
@@ -1880,7 +1930,7 @@
       case 'restskip': G.restEnd = 0; saveG(); gymTick(); return;
       case 'ex': { G.ex = v; { const rs = S && S.split && S.split.rests && S.split.rests[v]; if (rs) G.rest = rs; } const L = findLift(v); const last = G.sets.slice().reverse().find(x => x.lift === v); const sg = S && S.suggest && S.suggest[v]; if (last) { G.wt = last.wt || G.wt; G.reps = last.reps; } else if (sg) { if (sg.wt) G.wt = sg.wt; if (sg.reps) G.reps = sg.reps; } else if (L) { if (!L.repsOnly && L.best) G.wt = L.best; if (L.reps) G.reps = L.reps; } saveG(); render(); return; }
       case 'usesugg': { const sg = S && S.suggest && S.suggest[v]; if (sg) { if (sg.wt) G.wt = sg.wt; if (sg.reps) G.reps = sg.reps; saveG(); render(); } return; }
-      case 'liftview': liftView = liftView === v ? '' : v; if (tab !== 'life') { sub = 'fitness'; setTab('life'); } render(); setTimeout(() => { const el = document.querySelector('#lifeP .panel.y [data-a=liftclose]'); if (el) el.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 30); return;
+      case 'liftview': liftView = liftView === v ? '' : v; if (tab !== 'life') { setSub('fitness'); setTab('life'); } render(); setTimeout(() => { const el = document.querySelector('#lifeP .panel.y [data-a=liftclose]'); if (el) el.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 30); return;
       case 'liftclose': liftView = ''; render(); return;
       case 'wlog': { const n = parseFloat(val('wIn')); if (!(n > 50)) { toast('ENTER YOUR WEIGHT', 'r'); return; } act('weight', String(n)); if (S) { S.weights = (S.weights || []).filter(w => w[0] !== todayKey()); S.weights.push([todayKey(), n]); S.weightNow = n; } $('wIn').value = ''; $('wIn').blur(); render(); return; }
       case 'wgoal': { const n = parseFloat(val('wGoal')); if (!(n > 50)) return; act('weight', 'goal ' + n); if (S) S.weightGoal = n; render(); return; }
