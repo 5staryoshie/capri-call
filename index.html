@@ -368,6 +368,13 @@
   .lpages button{flex:1;background:none;border:0;border-right:1px solid rgba(236,46,58,.25);color:var(--dim);font:inherit;font-family:"Share Tech Mono",monospace;font-size:12px;letter-spacing:1px;padding:9px 4px}
   .lpages button:last-child{border-right:0}
   .lpages button.on{background:rgba(236,46,58,.22);color:var(--yel);box-shadow:inset 0 -2px 0 var(--yel)}
+  .lkgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .lk{background:rgba(36,12,18,.9);border:1.3px solid rgba(236,46,58,.55);padding:6px;display:flex;flex-direction:column;gap:4px;min-width:0}
+  .lk.on{border-color:var(--cyan);box-shadow:0 0 12px rgba(94,226,236,.25)}
+  .lk img{width:100%;aspect-ratio:16/9;object-fit:cover;background:#1a080c;display:block}
+  .lk b{font-family:"Chakra Petch",sans-serif;font-size:13px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lk small{font-family:"Share Tech Mono",monospace;font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lk button{margin-top:2px}
   .moretog{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;margin-top:18px;background:none;border:1px dashed rgba(236,46,58,.55);color:var(--ink);font:inherit;font-family:"Share Tech Mono",monospace;font-size:13px;letter-spacing:2px;padding:10px}
   .moretog b{color:var(--dim);font-weight:400;font-size:10.5px;letter-spacing:1px}
   .qq{font-size:19px;line-height:1.35;margin:12px 0 14px;white-space:pre-wrap;font-weight:600}
@@ -953,7 +960,7 @@
   let lastSync = store.get('capri-life-at', 0);   // when we last heard from her
   let tab = store.get('capri-tab', 'home'), sub = store.get('capri-lsub', 'budget');
   let achFilter = 'ALL', moneyIn = false, moneyCat = 'food', selGroup = '';
-  let homeMore = store.get('capri-hmore', false);
+  let homeMore = store.get('capri-hmore', false), homeView = '';
   let offline = false, myRids = {}, pendingRender = false;
   let G = store.get('capri-gym', null);           // the gym session on the phone
   if (G && G.on && Date.now() - G.start > 5 * 3600e3) G = null;   // a session left open overnight
@@ -1059,6 +1066,7 @@
 
   // ---------------------------------------------------------- HOME
   function pageHome() {
+    if (homeView === 'looks') return pageLooks();
     const h = new Date().getHours();
     const hi = h < 5 ? 'LATE NIGHT' : h < 12 ? 'GOOD MORNING' : h < 18 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
     let o = `<div class="ltitle">${hi}</div><div class="lsub">// NIGHT CITY · ${new Date().toLocaleDateString('en-US', {weekday: 'long', month: 'short', day: 'numeric'}).toUpperCase()}</div>${syncHtml()}`;
@@ -1089,9 +1097,10 @@
     const goalsNow = !!(S.review && (S.review.goals || []).length) || wd === 0 || wd === 1;
     if (goalsNow) o += goalsHtml();
     // ---- everything else folds away
-    const extra = ['LEVELS', 'SHORTCUTS'].concat(G.on || gymDay ? [] : ['GYM']).concat(goalsNow ? [] : ['GOALS']).concat(sleepNow ? [] : ['SLEEP']).concat(S.focusOn ? [] : ['FOCUS']).concat(['UNLOCKS']);
+    const extra = ['HER LOOK', 'LEVELS', 'SHORTCUTS'].concat(G.on || gymDay ? [] : ['GYM']).concat(goalsNow ? [] : ['GOALS']).concat(sleepNow ? [] : ['SLEEP']).concat(S.focusOn ? [] : ['FOCUS']).concat(['UNLOCKS']);
     o += `<button class="moretog" data-a="hmore">${homeMore ? '<span>SHOW LESS ▴</span>' : '<span>MORE ▾</span><b>' + extra.join(' · ') + '</b>'}</button>`;
     if (homeMore) {
+      o += lookCard();
       o += rankBars();
       o += `<div class="cards">
       <button class="card cut sel" data-a="go" data-v="budget" style="font:inherit;color:inherit"><div class="hb">BUDGET</div>${ICON.budget}<div class="v">${usd(left)}</div><div class="s">${S.limit > 0 ? Math.round(S.monthOut / S.limit * 100) + '% OF LIMIT' : 'LEFT THIS MONTH'}</div></button>
@@ -1265,6 +1274,32 @@
     return o;
   }
   setInterval(() => { const e = $('uLeft'); if (!e) return; const left = Math.max(0, urgeEnd - Date.now()); e.textContent = mmss(left / 1000); const t = $('uTip'); if (t) t.textContent = left > 0 ? BREATH[Math.floor((URGE_MS - left) / 20000) % BREATH.length] : 'Made it. How did it go?'; }, 1000);
+  // ---------------------------------------------------------- her look: outfits, add-ons, colors (from the Capri community)
+  const PREV = f => 'https://raw.githubusercontent.com/lachydotmcg/capri-mods/main/mods/' + encodeURIComponent(f) + '/preview.png';
+  function lookCard() {
+    const L = S && S.looks; if (!L) return '';
+    return head('HER LOOK', L.art === 'classic' ? 'CLASSIC ART' : '') + `<div class="row"><div class="t"><b style="white-space:normal">${esc(L.summary || 'her usual look')}</b><small>${L.status ? esc(L.status.toUpperCase()) : L.busy ? 'CHANGING... ' + L.pct + '%' : 'OUTFITS, ADD-ONS AND COLORS'}</small></div><button class="chip cy" data-a="hlooks">CHANGE</button></div>`;
+  }
+  function pageLooks() {
+    let o = `<div class="ltitle">HER LOOK</div><div class="lsub">// OUTFITS · ADD-ONS · COLORS</div>${syncHtml()}`;
+    o += `<div class="chips" style="margin-top:12px"><button class="chip" data-a="hback">‹ BACK</button></div>`;
+    const L = S && S.looks;
+    if (!L) return o + '<div class="panel cut" style="margin-top:16px"><div class="hint2">Waiting for your laptop...</div></div>';
+    const cat = L.catalog || [], worn = (L.outfit || L.colors || (L.addons || []).length);
+    o += `<div class="panel cut c" style="margin-top:10px;font-size:14px;line-height:1.4"><b>Wearing:</b> ${esc(L.summary || 'her usual look')}${L.busy ? `<div class="dim mono" style="font-size:11px;margin-top:4px">GETTING CHANGED... ${L.pct}%</div>` : ''}${L.status ? `<div class="dim mono" style="font-size:11px;margin-top:4px">${esc(L.status.toUpperCase())}</div>` : ''}</div>`;
+    o += `<div class="chips" style="margin-top:8px;flex-wrap:wrap">${worn ? '<button class="chip" data-a="lnormal">BACK TO NORMAL</button>' : ''}<button class="chip" data-a="lart" data-v="${L.art === 'classic' ? 'new' : 'classic'}">${L.art === 'classic' ? 'USE NEWER ART' : 'USE CLASSIC ART'}</button></div>`;
+    o += head('COLORS') + `<div class="chips" style="flex-wrap:wrap"><button class="chip ${!L.colors ? 'on' : ''}" data-a="lcolors" data-v="default">HER OWN</button>` +
+      cat.filter(x => x.c).map(x => `<button class="chip ${L.colors === x.f ? 'on' : 'cy'}" data-a="lcolors" data-v="${esc(x.f)}">${esc(x.n.replace('Colors: ', '').toUpperCase())}</button>`).join('') + '</div>';
+    o += head('OUTFITS & ADD-ONS', cat.filter(x => !x.c).length + ' TO TRY');
+    if (!cat.length) o += '<div class="hint2">The outfit list shows up once your laptop has it.</div>';
+    o += '<div class="lkgrid">' + cat.filter(x => !x.c).map(x => {
+      const busy = L.busy === x.f;
+      return `<div class="lk ${x.on ? 'on' : ''}"><img loading="lazy" alt="" src="${PREV(x.f)}" onerror="this.style.visibility='hidden'"><b>${esc(x.n)}</b><small>BY ${esc((x.a || '').toUpperCase())}${x.have ? ' · ON LAPTOP' : ''}</small>` +
+        (busy ? `<button class="chip" disabled>${L.pct}%</button>` : x.on ? `<button class="chip" data-a="loff" data-v="${esc(x.f)}">TAKE OFF</button>` : `<button class="chip cy" data-a="lwear" data-v="${esc(x.f)}">WEAR</button>`) + '</div>';
+    }).join('') + '</div>';
+    o += `<div class="dim" style="font-size:11px;margin-top:12px;line-height:1.4">Her art and animations: the Capri project by Lachy and her artist (github.com/lachydotmcg/capri-desktop), free for non-commercial use with credit. Outfits are by the Capri community (capri-mods), each by its maker. They download to your laptop, so an outfit can take a minute the first time.</div>`;
+    return o;
+  }
   // ---------------------------------------------------------- laptop storage (only shows up when it's low)
   function diskHtml() {
     const D = S && S.disk; if (!D || !D.low) return '';
@@ -1842,7 +1877,14 @@
     switch (a) {
       case 'go': setSub(v); setTab('life'); $('lifeP').scrollTop = 0; return;
       case 'tab': setTab(v); return;
+      case 'hlooks': homeView = 'looks'; setTab('home'); $('homeP').scrollTop = 0; return;
+      case 'hback': homeView = ''; render(); $('homeP').scrollTop = 0; return;
       case 'hmore': homeMore = !homeMore; store.set('capri-hmore', homeMore); render(); return;
+      case 'lwear': { act('outfit', v, true); const L = S && S.looks; if (L) { const it = (L.catalog || []).find(x => x.f === v); if (it && !it.have) { L.busy = v; L.pct = 0; } } toast('CHANGING...', 'c'); render(); return; }
+      case 'loff': { act('outfit', 'off ' + v, true); const L = S && S.looks; if (L) { if (L.outfit === v) L.outfit = ''; L.addons = (L.addons || []).filter(x => x !== v); (L.catalog || []).forEach(x => { if (x.f === v) x.on = false; }); } render(); return; }
+      case 'lnormal': { act('outfit', 'normal', true); const L = S && S.looks; if (L) { L.outfit = ''; L.addons = []; L.colors = ''; L.summary = 'her usual look'; (L.catalog || []).forEach(x => x.on = false); } render(); return; }
+      case 'lcolors': { act('colors', v, true); const L = S && S.looks; if (L) { L.colors = v === 'default' ? '' : v; } render(); return; }
+      case 'lart': { act('art', v, true); const L = S && S.looks; if (L) L.art = v; toast(v === 'classic' ? 'CLASSIC ART' : 'NEWER ART', 'c'); render(); return; }
       case 'dscan': act('diskscan', '', true); if (S && S.disk) S.disk.scanning = true; toast('CHECKING YOUR LAPTOP...', 'c'); render(); return;
       case 'sub': setSub(v); selGroup = ''; render(); $('lifeP').scrollTop = 0; return;
       case 'callnow': setTab('call'); setTimeout(() => { const cb = $('callBtn'); if (cb && $('callLbl').textContent.trim() === 'CALL') cb.click(); }, 50); return;
